@@ -10,7 +10,7 @@ edition = "2021"
 rust-version = "1.75"
 authors = ["Parapet Contributors"]
 license = "GPL-3.0-or-later"
-repository = "https://github.com/CamRed25/Frames"
+repository = "https://github.com/CamRed25/Parapet"
 
 [workspace.lints.clippy]
 pedantic = "warn"
