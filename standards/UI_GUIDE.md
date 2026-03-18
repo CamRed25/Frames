@@ -1,4 +1,4 @@
-# Frames — UI Guide
+# Parapet — UI Guide
 
 > **Scope:** GTK3 conventions, CSS theming, widget renderer rules, X11 EWMH window setup, and the boundary between widget data and widget rendering.
 > **Last Updated:** Mar 17, 2026
@@ -7,10 +7,10 @@
 
 ## 1. Overview
 
-Frames uses GTK3 for its UI layer. The bar is a single GtkWindow anchored to the screen edge via X11 EWMH properties. Widgets are GTK3 widgets arranged in a horizontal GtkBox.
+Parapet uses GTK3 for its UI layer. The bar is a single GtkWindow anchored to the screen edge via X11 EWMH properties. Widgets are GTK3 widgets arranged in a horizontal GtkBox.
 
 **UI layer responsibilities:**
-- Consume `WidgetData` from `frames_core` and render it as GTK3 widgets
+- Consume `WidgetData` from `parapet_core` and render it as GTK3 widgets
 - Handle X11 EWMH window type and strut setup
 - Apply CSS theming
 - Register glib timers that drive the polling loop
@@ -21,7 +21,7 @@ Frames uses GTK3 for its UI layer. The bar is a single GtkWindow anchored to the
 - Business logic of any kind
 - Any operation that blocks the GTK main thread
 
-All data computation lives in `frames_core`. Renderers in `frames_bar` display data and handle GTK events only.
+All data computation lives in `parapet_core`. Renderers in `parapet_bar` display data and handle GTK events only.
 
 ---
 
@@ -44,7 +44,7 @@ All data computation lives in `frames_core`. Renderers in `frames_bar` display d
 ```rust
 // bar.rs
 let window = gtk::Window::new(gtk::WindowType::Popup);
-window.set_title("frames");
+window.set_title("parapet");
 window.set_decorated(false);
 window.set_resizable(false);
 window.set_skip_taskbar_hint(true);
@@ -157,7 +157,7 @@ Inter-widget spacing is configured globally in `bar.widget_spacing` (pixels). Pe
 
 ### 5.1 Renderer Contract
 
-Each widget renderer in `frames_bar/src/widgets/` must:
+Each widget renderer in `parapet_bar/src/widgets/` must:
 
 1. Implement a `new(config: &WidgetConfig) -> anyhow::Result<Self>` constructor
 2. Expose a `widget(&self) -> &gtk::Widget` method returning the root GTK widget to embed in the bar
@@ -202,11 +202,11 @@ fn update(&self, data: &WidgetData) {
     }
 }
 
-// Correct — formatting only; color logic belongs in CSS or frames_core
+// Correct — formatting only; color logic belongs in CSS or parapet_core
 fn update(&self, data: &WidgetData) {
     if let WidgetData::Cpu { usage_pct, .. } = data {
         self.label.set_text(&format!("{:.0}%", usage_pct));
-        // High CPU CSS class applied based on threshold, set by frames_core output
+        // High CPU CSS class applied based on threshold, set by parapet_core output
         let ctx = self.label.get_style_context();
         if *usage_pct > 80.0 {
             ctx.add_class("warning");
@@ -230,7 +230,7 @@ config field > `bar.css` raw path > built-in default.
 ```rust
 // css.rs
 pub enum ThemeSource<'a> {
-    Named(&'a str),   // ~/.config/frames/themes/<name>.css
+    Named(&'a str),   // ~/.config/parapet/themes/<name>.css
     Path(&'a Path),   // raw path from bar.css config field
     Default,          // compiled-in built-in theme
 }
@@ -263,10 +263,10 @@ All bar and widget elements have stable CSS class names. These are the CSS API s
 
 | Element | CSS Class |
 |---------|-----------|
-| Bar root box | `.frames-bar` |
-| Left section | `.frames-left` |
-| Center section | `.frames-center` |
-| Right section | `.frames-right` |
+| Bar root box | `.parapet-bar` |
+| Left section | `.parapet-left` |
+| Center section | `.parapet-center` |
+| Right section | `.parapet-right` |
 | Any widget container | `.widget` |
 | Clock widget | `.widget-clock` |
 | CPU widget | `.widget-cpu` |
@@ -324,7 +324,7 @@ Do not hardcode pixel dimensions or colors in Rust code. All visual properties b
 ### 6.4 Theme Naming and Directory Layout
 
 See `DOCS/theme-spec.md` for the full community theme specification, including
-the directory layout (`~/.config/frames/themes/`), dark/light variant naming
+the directory layout (`~/.config/parapet/themes/`), dark/light variant naming
 (`<name>-dark.css`, `<name>-light.css`), metadata format, naming rules, CSS
 variable contract, and hot-reload behaviour.
 
@@ -343,7 +343,7 @@ fn get_target_monitor(screen: &gdk::Screen, config: &BarConfig) -> i32 {
 }
 ```
 
-The bar renders on one monitor. Multi-bar setups (one bar per monitor) require running multiple `frames_bar` instances with different configs.
+The bar renders on one monitor. Multi-bar setups (one bar per monitor) require running multiple `parapet_bar` instances with different configs.
 
 ### 7.2 Monitor Change Handling
 
@@ -386,7 +386,7 @@ This rule is stated once and applies everywhere:
 
 > **Renderers display data. Renderers handle GTK events. Renderers do not compute or transform data.**
 
-Data transformation (formatting, thresholds, unit conversion) belongs in `frames_core` widget implementations or in the renderer's `update()` method as simple display formatting only.
+Data transformation (formatting, thresholds, unit conversion) belongs in `parapet_core` widget implementations or in the renderer's `update()` method as simple display formatting only.
 
 ---
 

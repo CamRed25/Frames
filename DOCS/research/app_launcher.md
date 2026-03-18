@@ -4,11 +4,11 @@
 
 ## Question
 
-What is the best approach to add a Windows-style app launcher widget to the center of the Frames status bar? Specifically: how should installed applications be enumerated, how should the search list be fuzzy-filtered as the user types, and what GTK3 widgets should compose the popup UI?
+What is the best approach to add a Windows-style app launcher widget to the center of the Parapet status bar? Specifically: how should installed applications be enumerated, how should the search list be fuzzy-filtered as the user types, and what GTK3 widgets should compose the popup UI?
 
 ## Summary
 
-Use `gio::AppInfo::all()` to enumerate installed apps (zero new dependencies — `gio` is already a transitive dependency via `gtk ~0.18`), add `fuzzy-matcher = "0.3"` (MIT, 14.9 M downloads) for interactive filtering, and build the popup using `gtk::Popover` + `gtk::SearchEntry` + `gtk::ListBox`. The launcher is a `frames_bar`-only UI interaction widget — it does not produce `WidgetData` and bypasses the `Poller` pipeline entirely, the same pattern already used by `WorkspacesWidget`.
+Use `gio::AppInfo::all()` to enumerate installed apps (zero new dependencies — `gio` is already a transitive dependency via `gtk ~0.18`), add `fuzzy-matcher = "0.3"` (MIT, 14.9 M downloads) for interactive filtering, and build the popup using `gtk::Popover` + `gtk::SearchEntry` + `gtk::ListBox`. The launcher is a `parapet_bar`-only UI interaction widget — it does not produce `WidgetData` and bypasses the `Poller` pipeline entirely, the same pattern already used by `WorkspacesWidget`.
 
 ---
 
@@ -181,16 +181,16 @@ gtk::Button (.launcher-button)       ← bar center section
 
 ### Architecture Fit
 
-The launcher is a **`frames_bar`-only UI interaction widget**. Key points:
+The launcher is a **`parapet_bar`-only UI interaction widget**. Key points:
 
 | Concern | Decision |
 |---------|----------|
-| `frames_core` changes needed? | **None.** No new `WidgetData` variant, no new `Widget` impl. |
+| `parapet_core` changes needed? | **None.** No new `WidgetData` variant, no new `Widget` impl. |
 | Poller integration? | **None.** Like `WorkspacesWidget`, the launcher bypasses the `Widget → Poller → renderer` pipeline. |
 | When to load app list? | Lazily on first `Popover::popup()` call, then cache in the widget struct. |
 | Launch mechanism | `AppInfoExt::launch(&[], gio::AppLaunchContext::NONE)` — GLib-managed, no `std::process::Command`. |
 | Config key | `type = "launcher"` in `[[bar.widgets]]`; no extra fields required at launch. |
-| New file | `crates/frames_bar/src/widgets/launcher.rs` |
+| New file | `crates/parapet_bar/src/widgets/launcher.rs` |
 | Factory case | `"launcher" => build_launcher_widget(...)` in `main.rs` |
 
 **Architectural exception note (same as workspaces):** launcher bypasses the `Widget → Poller` pipeline. Must be documented in `DOCS/futures.md` as technical debt, and the exception noted in the implementation.
@@ -201,14 +201,14 @@ The launcher is a **`frames_bar`-only UI interaction widget**. Key points:
 
 | File | Change |
 |------|--------|
-| `crates/frames_bar/Cargo.toml` | Add `fuzzy-matcher = "0.3"` |
-| `crates/frames_bar/src/widgets/launcher.rs` | New file — button, popover, search entry, list box, launch handler |
-| `crates/frames_bar/src/widgets/mod.rs` | `pub mod launcher;` |
-| `crates/frames_bar/src/main.rs` | Factory arm `"launcher"` |
-| `crates/frames_bar/src/themes/default.css` | `.launcher-button`, `.launcher-popover`, `.launcher-row` styles |
+| `crates/parapet_bar/Cargo.toml` | Add `fuzzy-matcher = "0.3"` |
+| `crates/parapet_bar/src/widgets/launcher.rs` | New file — button, popover, search entry, list box, launch handler |
+| `crates/parapet_bar/src/widgets/mod.rs` | `pub mod launcher;` |
+| `crates/parapet_bar/src/main.rs` | Factory arm `"launcher"` |
+| `crates/parapet_bar/src/themes/default.css` | `.launcher-button`, `.launcher-popover`, `.launcher-row` styles |
 | `DOCS/futures.md` | Note: launcher bypasses Poller (same debt as workspaces) |
 
-`frames_core` — **zero changes**.
+`parapet_core` — **zero changes**.
 
 ---
 
@@ -219,7 +219,7 @@ Implement the launcher as follows:
 1. **App catalog:** `gio::AppInfo::all()` filtered by `should_show()` — no new dependency
 2. **Fuzzy matching:** `fuzzy-matcher = "0.3"` (MIT) — one new dependency
 3. **UI:** `gtk::Button` → `gtk::Popover` → `gtk::SearchEntry` + `gtk::ListBox`
-4. **Architecture:** `frames_bar`-only, no `frames_core` changes, same bypass pattern as `WorkspacesWidget`
+4. **Architecture:** `parapet_bar`-only, no `parapet_core` changes, same bypass pattern as `WorkspacesWidget`
 
 This is the minimum-viable path. It fits cleanly into the existing codebase, introduces only one new dependency (MIT-licensed), and produces a correct freedesktop-standard launch experience on Cinnamon / X11.
 
@@ -230,7 +230,7 @@ This is the minimum-viable path. It fits cleanly into the existing codebase, int
 
 ## Standards Conflict / Proposed Update
 
-None. The existing standards already accommodate `frames_bar`-only UI interaction widgets (WIDGET_API.md §3, WorkspacesWidget precedent). No standard changes are needed.
+None. The existing standards already accommodate `parapet_bar`-only UI interaction widgets (WIDGET_API.md §3, WorkspacesWidget precedent). No standard changes are needed.
 
 ---
 

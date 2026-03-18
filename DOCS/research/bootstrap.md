@@ -4,11 +4,11 @@
 
 ## Question
 
-What is the correct sequence of steps to bootstrap the Frames codebase from zero code (standards only) to a buildable, testable skeleton?
+What is the correct sequence of steps to bootstrap the Parapet codebase from zero code (standards only) to a buildable, testable skeleton?
 
 ## Summary
 
-The project has fully-defined standards and architecture but no code at all. The correct path is: scaffold the workspace files first, build `frames_core` module by module before touching GTK, then wire up `frames_bar` once the core library compiles cleanly. The clock widget is the best first widget — it has no sysfs dependencies and immediately proves the full data-flow pipeline.
+The project has fully-defined standards and architecture but no code at all. The correct path is: scaffold the workspace files first, build `parapet_core` module by module before touching GTK, then wire up `parapet_bar` once the core library compiles cleanly. The clock widget is the best first widget — it has no sysfs dependencies and immediately proves the full data-flow pipeline.
 
 ---
 
@@ -33,8 +33,8 @@ These files have no code dependencies. Create them before writing any Rust.
 | File | Source | Notes |
 |------|--------|-------|
 | `Cargo.toml` | BUILD_GUIDE §2.1 | Workspace root; exact template in the standard |
-| `crates/frames_core/Cargo.toml` | BUILD_GUIDE §2.2 | Template in the standard |
-| `crates/frames_bar/Cargo.toml` | BUILD_GUIDE §2.2 | Template in the standard |
+| `crates/parapet_core/Cargo.toml` | BUILD_GUIDE §2.2 | Template in the standard |
+| `crates/parapet_bar/Cargo.toml` | BUILD_GUIDE §2.2 | Template in the standard |
 | `rustfmt.toml` | CODING_STANDARDS §1.3 | Exact content in the standard |
 | `justfile` | BUILD_GUIDE §1.3 | Recipes: `check`, `check-headless`, `install-hooks` |
 | `.cargo/config.toml` | (if needed) | Target-specific flags; defer unless CI requires it |
@@ -43,16 +43,16 @@ These files have no code dependencies. Create them before writing any Rust.
 
 ---
 
-### Phase 2 — `frames_core` Implementation Order
+### Phase 2 — `parapet_core` Implementation Order
 
 Build bottom-up. Each module depends only on modules above it in this list.
 
 #### Step 1: `error.rs`
-Defines `FramesError`. Everything else in the crate returns this type. Write it first so `?` is available everywhere.
+Defines `ParapetError`. Everything else in the crate returns this type. Write it first so `?` is available everywhere.
 
 ```
-FramesError variants to implement (ARCHITECTURE §4.5):
-  Config(#[from] ConfigError)
+ParapetError variants to implement (ARCHITECTURE §4.5):
+  Config(#[from] ParapetConfigError)
   SysInfo(String)
   Battery(#[from] std::io::Error)
   WidgetNotFound { name: String }
@@ -61,7 +61,7 @@ FramesError variants to implement (ARCHITECTURE §4.5):
 Unit test: confirm each variant's `Display` output matches the `#[error(...)]` string.
 
 #### Step 2: `widget.rs`
-Defines the `Widget` trait and `WidgetData` enum. This is the contract between `frames_core` and `frames_bar` — nothing in either crate works without it.
+Defines the `Widget` trait and `WidgetData` enum. This is the contract between `parapet_core` and `parapet_bar` — nothing in either crate works without it.
 
 Key decisions (already made in WIDGET_API.md):
 - `WidgetData` is `#[non_exhaustive]` — add the attribute from day one
@@ -71,7 +71,7 @@ Key decisions (already made in WIDGET_API.md):
 Unit tests: a `MinimalWidget` stub that satisfies the contract (see TESTING_GUIDE §2.3 for the exact pattern).
 
 #### Step 3: `config.rs`
-Defines `FramesConfig`, `BarConfig`, `WidgetConfig` with serde/toml. The TOML config file path is `~/.config/frames/config.toml`.
+Defines `ParapetConfig`, `BarConfig`, `WidgetConfig` with serde/toml. The TOML config file path is `~/.config/parapet/config.toml`.
 
 Design (from ARCHITECTURE §4.4 and CONFIG_MODEL.md):
 - `BarConfig` fields: `position`, `height`, `monitor`, CSS path
@@ -102,21 +102,21 @@ Reads `/sys/class/power_supply/`. Yields `WidgetData::Battery { charge_pct: Opti
 Unit test: uses `tempfile` to create a fake `/sys/class/power_supply/` tree and asserts correct parsing.
 
 #### Step 7: `widgets/workspaces.rs`
-A stub returning a static `WidgetData::Workspaces { count: 1, active: 0, names: vec![] }`. Real X11 EWMH query lives in `frames_bar` — core only holds the data model. This stub satisfies the `Widget` trait contract so `frames_bar` can receive workspace data.
+A stub returning a static `WidgetData::Workspaces { count: 1, active: 0, names: vec![] }`. Real X11 EWMH query lives in `parapet_bar` — core only holds the data model. This stub satisfies the `Widget` trait contract so `parapet_bar` can receive workspace data.
 
 #### Step 8: `poll.rs`
 `Poller` drives widget updates. Per ARCHITECTURE §4.3:
 - Pure Rust struct — no GTK, no glib timers
-- Called on the glib main thread from `frames_bar`
+- Called on the glib main thread from `parapet_bar`
 - `poll()` returns `Vec<(String, WidgetData)>` for widgets whose interval has elapsed
 
 Unit test: mock widgets with known intervals, advance a fake clock, assert which widgets are called on each tick.
 
 ---
 
-### Phase 3 — `frames_bar` Implementation Order
+### Phase 3 — `parapet_bar` Implementation Order
 
-Start only after `frames_core` compiles cleanly and its tests pass with `--no-default-features`.
+Start only after `parapet_core` compiles cleanly and its tests pass with `--no-default-features`.
 
 #### Step 1: `main.rs` stub
 GTK init, config load, `gtk::main()`. No widgets rendered yet. Goal: a window appears.
@@ -128,7 +128,7 @@ The `Bar` struct (BAR_DESIGN §2):
 - EWMH properties via GDK X11 after `realize`
 - `_NET_WM_STRUT_PARTIAL` using the 12-value array from BAR_DESIGN §3
 
-This is the hardest part of `frames_bar`. Key subtlety: strut must be set **after** `realize` fires, because the GDK window doesn't have an X11 ID until then. Connect to the `realize` signal:
+This is the hardest part of `parapet_bar`. Key subtlety: strut must be set **after** `realize` fires, because the GDK window doesn't have an X11 ID until then. Connect to the `realize` signal:
 
 ```rust
 window.connect_realize(move |w| {
@@ -151,14 +151,14 @@ Load a user CSS file (path from config) via `gtk::CssProvider`. Fall back to a b
 Implement the minimum end-to-end pipeline before adding more widgets:
 
 1. Scaffold workspace
-2. `frames_core`: `error.rs` → `widget.rs` → `config.rs` → `clock.rs` → `poll.rs`
-3. `frames_bar`: `main.rs` → `bar.rs` → `widgets/clock.rs` → `css.rs`
+2. `parapet_core`: `error.rs` → `widget.rs` → `config.rs` → `clock.rs` → `poll.rs`
+3. `parapet_bar`: `main.rs` → `bar.rs` → `widgets/clock.rs` → `css.rs`
 4. Verify: bar appears, clock ticks, struts reserve screen space
 5. Then add remaining widgets one at a time
 
 This proves the architecture before committing to more implementation work.
 
-### Option B: Full `frames_core` first, then full `frames_bar`
+### Option B: Full `parapet_core` first, then full `parapet_bar`
 
 Build all core widgets before starting GTK work. Safer for CI (headless tests pass first) but delays real visual feedback.
 
@@ -173,7 +173,7 @@ Implementation sequence:
 2. **Phase 2 subset:** `error.rs` → `widget.rs` → `config.rs` → `clock.rs` → `poll.rs`
 3. **Phase 3 subset:** `main.rs` stub → `bar.rs` → `widgets/clock.rs` → `css.rs`
 4. Verify bar window appears with working clock and correct struts
-5. Expand: add remaining `frames_core` widgets, then their `frames_bar` renderers
+5. Expand: add remaining `parapet_core` widgets, then their `parapet_bar` renderers
 
 The `Planner` agent can generate a detailed step-by-step plan from here. Once planning is approved, code writing can begin.
 
@@ -207,5 +207,5 @@ One gap to note: `DOCS/DECISIONS.md` does not exist yet. The first architectural
 
 1. **`justfile` content** — The standards reference `just check` and `just check-headless` but do not define the exact recipe contents. These need to be written before CI is set up.
 2. **Monitor detection** — `bar.rs` needs to detect which monitor to display on. ARCHITECTURE §6.1 mentions `BarConfig.monitor` but BAR_DESIGN §4 (positioning) was only partially read. Verify multi-monitor positioning logic before implementing `Bar::new()`.
-3. **Config default path** — Does `config.rs` create `~/.config/frames/config.toml` on first run, or fail and print a helpful error? RULE_OF_LAW §3.5 (silent failure not acceptable) implies a helpful error is correct. CONFIG_MODEL.md should be read before implementing `config.rs`.
+3. **Config default path** — Does `config.rs` create `~/.config/parapet/config.toml` on first run, or fail and print a helpful error? RULE_OF_LAW §3.5 (silent failure not acceptable) implies a helpful error is correct. CONFIG_MODEL.md should be read before implementing `config.rs`.
 4. **notify watcher** — Config hot-reload via the `notify` crate is listed in the dependency graph. Whether this is needed in the initial vertical slice or can be deferred should be decided before writing `config.rs`.

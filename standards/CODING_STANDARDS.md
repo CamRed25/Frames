@@ -1,6 +1,6 @@
-# Frames — Coding Standards
+# Parapet — Coding Standards
 
-> **Scope:** All Rust code in `frames/crates/`. Covers naming, error handling, unsafe rules, async patterns, FFI conventions, and toolchain configuration.
+> **Scope:** All Rust code in `parapet/crates/`. Covers naming, error handling, unsafe rules, async patterns, FFI conventions, and toolchain configuration.
 > **Last Updated:** Mar 17, 2026
 
 ---
@@ -86,34 +86,34 @@ Follow Rust API Guidelines throughout:
 
 | Item | Convention | Example |
 |------|-----------|---------|
-| Types, traits, enums | `UpperCamelCase` | `WidgetData`, `FramesError` |
+| Types, traits, enums | `UpperCamelCase` | `WidgetData`, `ParapetError` |
 | Functions, methods | `snake_case` | `update_widget`, `load_config` |
 | Variables, parameters | `snake_case` | `charge_pct`, `widget_name` |
 | Constants | `SCREAMING_SNAKE_CASE` | `DEFAULT_HEIGHT`, `POLL_INTERVAL_MS` |
 | Modules | `snake_case` | `widgets`, `poll` |
-| Crates | `snake_case` | `frames_core`, `frames_bar` |
+| Crates | `snake_case` | `parapet_core`, `parapet_bar` |
 | Lifetimes | short lowercase | `'a`, `'cfg`, `'data` |
 | Type parameters | single uppercase or short | `T`, `E`, `W` |
 
-### 2.2 Frames-Specific Conventions
+### 2.2 Parapet-Specific Conventions
 
 - **Widget data types** use noun phrases describing the data, not the widget:
   - `CpuData`, `MemoryData`, `ClockData` — if split into separate structs
   - Or as `WidgetData::Cpu { ... }` — enum variant names match the widget type
 - **Error types** are named for the operation that failed, suffixed with `Error`:
-  - `ConfigError`, `PollError`, `BatteryReadError`
-- **Config types** are suffixed with `Config`: `BarConfig`, `WidgetConfig`, `FramesConfig`
-- **Renderer types** in `frames_bar` are suffixed with `Widget`: `ClockWidget`, `CpuWidget`
+  - `ParapetConfigError`, `PollError`, `BatteryReadError`
+- **Config types** are suffixed with `Config`: `BarConfig`, `WidgetConfig`, `ParapetConfig`
+- **Renderer types** in `parapet_bar` are suffixed with `Widget`: `ClockWidget`, `CpuWidget`
 
 ### 2.3 Module-Level Naming
 
 Public API items exported from a module must read clearly at the call site:
 
 ```rust
-// Good — reads clearly as frames_core::poll
+// Good — reads clearly as parapet_core::poll
 pub fn poll_all(&mut self) -> Vec<(String, WidgetData)>
 
-// Avoid — redundant prefix when called as frames_core::poll::poll_poll_all
+// Avoid — redundant prefix when called as parapet_core::poll::poll_poll_all
 pub fn poll_poll_all(&mut self) -> Vec<(String, WidgetData)>
 ```
 
@@ -131,13 +131,13 @@ Silent failure is never acceptable.
 
 | Layer | Crate | Pattern |
 |-------|-------|---------|
-| Library (`frames_core`) | `thiserror` | Typed error enums, structured variants |
-| Application (`frames_bar`, `main`) | `anyhow` | Context-annotated propagation |
+| Library (`parapet_core`) | `thiserror` | Typed error enums, structured variants |
+| Application (`parapet_bar`, `main`) | `anyhow` | Context-annotated propagation |
 
 ```rust
-// frames_core — typed library error
+// parapet_core — typed library error
 #[derive(Debug, thiserror::Error)]
-pub enum ConfigError {
+pub enum ParapetConfigError {
     #[error("config file not found at {path}")]
     NotFound { path: PathBuf },
     #[error("config parse error: {0}")]
@@ -146,9 +146,9 @@ pub enum ConfigError {
     Io(#[from] std::io::Error),
 }
 
-// frames_bar — application propagation with context
+// parapet_bar — application propagation with context
 fn start_bar(config_path: &Path) -> anyhow::Result<()> {
-    let config = FramesConfig::load(config_path)
+    let config = ParapetConfig::load(config_path)
         .context("failed to load bar config")?;
     Ok(())
 }
@@ -160,10 +160,10 @@ Use `?` for propagation. Do not use `.unwrap()` or `.expect()` in production cod
 
 ```rust
 // Good
-let config = FramesConfig::load(&path)?;
+let config = ParapetConfig::load(&path)?;
 
 // Never in production
-let config = FramesConfig::load(&path).unwrap();
+let config = ParapetConfig::load(&path).unwrap();
 ```
 
 `.expect()` is permitted **only** in:
@@ -212,8 +212,8 @@ All crates are members of the workspace root `Cargo.toml`. Shared dependencies a
 # workspace Cargo.toml
 [workspace]
 members = [
-    "crates/frames_core",
-    "crates/frames_bar",
+    "crates/parapet_core",
+    "crates/parapet_bar",
 ]
 resolver = "2"
 
@@ -253,7 +253,7 @@ default = []
 ipc = ["dep:tokio"]   # Optional IPC socket for external control
 ```
 
-`frames_core` and `frames_bar` must build and all tests must pass with `--no-default-features`. Optional features are strictly additive.
+`parapet_core` and `parapet_bar` must build and all tests must pass with `--no-default-features`. Optional features are strictly additive.
 
 ### 4.4 build.rs Rules
 
@@ -366,12 +366,12 @@ Every public item must have a doc comment:
 ///
 /// # Errors
 ///
-/// Returns [`FramesError::SysInfo`] if memory information cannot be read.
+/// Returns [`ParapetError::SysInfo`] if memory information cannot be read.
 ///
 /// # Panics
 ///
 /// Does not panic. All error conditions return `Err`.
-pub fn memory_usage(&mut self) -> Result<WidgetData, FramesError> {
+pub fn memory_usage(&mut self) -> Result<WidgetData, ParapetError> {
 ```
 
 Required sections for non-trivial public functions:
@@ -425,7 +425,7 @@ mod tests {
             position = "top"
             height = 30
         "#;
-        let config: FramesConfig = toml::from_str(toml).unwrap();
+        let config: ParapetConfig = toml::from_str(toml).unwrap();
         assert_eq!(config.bar.position, BarPosition::Top);
     }
 }

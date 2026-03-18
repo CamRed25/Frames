@@ -25,8 +25,8 @@ through an `mpsc` channel. `Widget::update()` drains the channel and returns cac
 data when no events have arrived. Eliminates all per-poll subprocess spawning after
 initial startup.
 
-Both parts are confined entirely to `frames_core/src/widgets/volume.rs`. No GTK,
-GDK, or display imports are involved. `frames_core`'s headless-test guarantee is
+Both parts are confined entirely to `parapet_core/src/widgets/volume.rs`. No GTK,
+GDK, or display imports are involved. `parapet_core`'s headless-test guarantee is
 fully preserved.
 
 **Design authority:** `DOCS/research/volume-event-driven.md` and the design note
@@ -39,7 +39,7 @@ rejected alternatives.
 
 | File | Change |
 |------|--------|
-| `crates/frames_core/src/widgets/volume.rs` | Primary: all Part 1 + Part 2 implementation |
+| `crates/parapet_core/src/widgets/volume.rs` | Primary: all Part 1 + Part 2 implementation |
 | `standards/WIDGET_API.md` | §7.2 doc clarification + new §7.4; patch version bump |
 | `DOCS/futures.md` | Mark `VolumeWidget double-pactl` entry as completed |
 
@@ -151,7 +151,7 @@ WIDGET_API §2 versioning table).
 
 #### Step 1 — Extract parse helpers and rewrite `read_volume`
 
-**File:** `crates/frames_core/src/widgets/volume.rs`
+**File:** `crates/parapet_core/src/widgets/volume.rs`
 
 1. Add private `parse_volume_pct(text: &str) -> Option<f32>`:
 
@@ -212,7 +212,7 @@ Verify: `cargo build --workspace` exits 0.
 
 #### Step 2 — Unit tests for parse helpers
 
-**File:** `crates/frames_core/src/widgets/volume.rs`, `#[cfg(test)]` block
+**File:** `crates/parapet_core/src/widgets/volume.rs`, `#[cfg(test)]` block
 
 Add tests that exercise the parse helpers directly against representative fixture
 text, without requiring `pactl` at all:
@@ -284,7 +284,7 @@ fn volume_update_does_not_error() {
 }
 ```
 
-Verify: `cargo test -p frames_core --no-default-features` exits 0.
+Verify: `cargo test -p parapet_core --no-default-features` exits 0.
 
 ---
 
@@ -296,7 +296,7 @@ Verify: `cargo test -p frames_core --no-default-features` exits 0.
 
 #### Step 3 — Add `VolumeData` struct and `subscribe_loop`
 
-**File:** `crates/frames_core/src/widgets/volume.rs`
+**File:** `crates/parapet_core/src/widgets/volume.rs`
 
 Add at the top of the module, below the `use` block:
 
@@ -366,13 +366,13 @@ fn subscribe_loop(tx: std::sync::mpsc::Sender<VolumeData>) {
 }
 ```
 
-Verify: `cargo build -p frames_core` exits 0.
+Verify: `cargo build -p parapet_core` exits 0.
 
 ---
 
 #### Step 4 — Restructure `VolumeWidget`
 
-**File:** `crates/frames_core/src/widgets/volume.rs`
+**File:** `crates/parapet_core/src/widgets/volume.rs`
 
 Replace the current struct definition:
 
@@ -405,14 +405,14 @@ pub struct VolumeWidget {
 }
 ```
 
-Verify: `cargo build -p frames_core` exits 0 (expected: constructor and update()
+Verify: `cargo build -p parapet_core` exits 0 (expected: constructor and update()
 do not compile yet — compile errors are expected here and fixed in Steps 5–6).
 
 ---
 
 #### Step 5 — Update `VolumeWidget::new()`
 
-**File:** `crates/frames_core/src/widgets/volume.rs`
+**File:** `crates/parapet_core/src/widgets/volume.rs`
 
 Replace the `new()` body:
 
@@ -435,7 +435,7 @@ impl VolumeWidget {
 
         let thread_handle =
             std::thread::Builder::new()
-                .name("frames-volume-subscribe".into())
+                .name("parapet-volume-subscribe".into())
                 .spawn(move || subscribe_loop(tx))
                 // Spawning a thread can only fail if the OS has hit its thread limit;
                 // treat this the same as pactl being absent — the widget will return
@@ -456,13 +456,13 @@ impl VolumeWidget {
 }
 ```
 
-Verify: `cargo build -p frames_core` exits 0.
+Verify: `cargo build -p parapet_core` exits 0.
 
 ---
 
 #### Step 6 — Rewrite `Widget::update()`
 
-**File:** `crates/frames_core/src/widgets/volume.rs`
+**File:** `crates/parapet_core/src/widgets/volume.rs`
 
 Replace the `impl Widget for VolumeWidget` block:
 
@@ -472,7 +472,7 @@ impl Widget for VolumeWidget {
         &self.name
     }
 
-    fn update(&mut self) -> Result<WidgetData, FramesError> {
+    fn update(&mut self) -> Result<WidgetData, ParapetError> {
         let rx = self.rx.lock().expect(
             "volume subscribe rx mutex poisoned; this indicates a bug in subscribe_loop"
         );
@@ -513,7 +513,7 @@ Verify: `cargo clippy --workspace -- -D warnings` exits 0.
 
 #### Step 7 — Update unit tests
 
-**File:** `crates/frames_core/src/widgets/volume.rs`, `#[cfg(test)]` block
+**File:** `crates/parapet_core/src/widgets/volume.rs`, `#[cfg(test)]` block
 
 The existing three tests remain valid. Add one new test and update one:
 
@@ -542,7 +542,7 @@ fn volume_widget_satisfies_send_sync() {
 }
 ```
 
-Verify: `cargo test -p frames_core --no-default-features` exits 0.
+Verify: `cargo test -p parapet_core --no-default-features` exits 0.
 Verify: `cargo test --workspace` exits 0.
 
 ---
@@ -593,7 +593,7 @@ bound required by `Widget: Send + Sync`. `Mutex<T>: Sync where T: Send`.
    etc.). Do not return `Err` — this is a degraded but recoverable state.
 5. Drop the lock before cloning or returning the cached value.
 
-**Thread naming:** Use `std::thread::Builder::new().name("frames-<purpose>")` so
+**Thread naming:** Use `std::thread::Builder::new().name("parapet-<purpose>")` so
 threads appear with meaningful names in debuggers and OS process listings.
 
 **Thread lifecycle:** The background thread exits when `tx.send()` fails because
@@ -675,13 +675,13 @@ Move the entry to the "Completed / Integrated" section with the range
 | `WIDGET_API.md` update | Required in same commit as Step 8 |
 
 The change is **non-breaking**. No downstream match arms need updating. No
-version gate is required for renderers in `frames_bar`.
+version gate is required for renderers in `parapet_bar`.
 
 ---
 
 ## Error Handling Plan
 
-All changes are in `frames_core`. Per CODING_STANDARDS §3.2, typed errors apply.
+All changes are in `parapet_core`. Per CODING_STANDARDS §3.2, typed errors apply.
 
 | Scenario | Handling |
 |----------|----------|
@@ -691,7 +691,7 @@ All changes are in `frames_core`. Per CODING_STANDARDS §3.2, typed errors apply
 | `Mutex` poisoned | `.expect("…")` with invariant message — the only permitted `.expect()` case per CODING_STANDARDS §3.3 |
 | Empty `mpsc` channel (no events since last tick) | `TryRecvError::Empty` → normal path; return cached; do **not** log |
 
-No new `FramesError` variants are needed. No `.unwrap()` in production code paths.
+No new `ParapetError` variants are needed. No `.unwrap()` in production code paths.
 
 ---
 
@@ -712,13 +712,13 @@ Per TESTING_GUIDE §3 and §5:
 | `volume_update_does_not_error` | Unit | `volume.rs` `#[cfg(test)]` | ✅ (existing, updated comment) |
 | `volume_widget_update_returns_ok_when_subscribe_absent` | Unit | `volume.rs` `#[cfg(test)]` | ✅ (new) |
 
-All tests run with `cargo test -p frames_core --no-default-features`. No GTK init.
+All tests run with `cargo test -p parapet_core --no-default-features`. No GTK init.
 No `DISPLAY` required. No pactl required — tests use fixture strings or rely on the
 widget's `None`-return fallback path.
 
 The `20ms` sleep in `volume_widget_update_returns_ok_when_subscribe_absent` is
 an intentional timing allow for thread spawn + pactl absence determination. This
-is acceptable because `frames_core` never imports GTK and `std::thread::sleep` is
+is acceptable because `parapet_core` never imports GTK and `std::thread::sleep` is
 display-system-agnostic.
 
 ---
@@ -765,7 +765,7 @@ event-driven via pactl subscribe background thread`.
 - [ ] `cargo build --workspace` exits 0
 - [ ] `cargo clippy --workspace -- -D warnings` exits 0
 - [ ] `cargo fmt --all -- --check` exits 0
-- [ ] `cargo test -p frames_core --no-default-features` exits 0
+- [ ] `cargo test -p parapet_core --no-default-features` exits 0
 - [ ] `cargo test --workspace` exits 0
 
 ---

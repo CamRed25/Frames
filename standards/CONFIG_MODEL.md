@@ -1,4 +1,4 @@
-# Frames — Config Model
+# Parapet — Config Model
 
 > **Scope:** TOML configuration file structure, field definitions, defaults, validation rules, and config file location.
 > **Last Updated:** Jan 11, 2025
@@ -7,31 +7,31 @@
 
 ## 1. Overview
 
-Frames is configured entirely via a single TOML file. There is no database, no registry, and no binary config format. The config file is human-editable and version-controllable.
+Parapet is configured entirely via a single TOML file. There is no database, no registry, and no binary config format. The config file is human-editable and version-controllable.
 
-**Config file location:** `~/.config/frames/config.toml`
+**Config file location:** `~/.config/parapet/config.toml`
 
-Override with the `FRAMES_CONFIG` environment variable:
+Override with the `PARAPET_CONFIG` environment variable:
 ```bash
-FRAMES_CONFIG=/path/to/config.toml frames_bar
+PARAPET_CONFIG=/path/to/config.toml parapet_bar
 ```
 
 The config file is watched for changes at runtime. When the file is modified, affected widgets are reloaded without restarting the bar.
 
-**Hot-reload:** The config file is watched via `notify`. When the file is modified, `frames_bar` reloads the config and rebuilds the widget tree without restarting the process. A 500 ms debounce prevents thrashing on rapid saves.
+**Hot-reload:** The config file is watched via `notify`. When the file is modified, `parapet_bar` reloads the config and rebuilds the widget tree without restarting the process. A 500 ms debounce prevents thrashing on rapid saves.
 
 ---
 
 ## 2. Top-Level Structure
 
 ```toml
-# ~/.config/frames/config.toml
+# ~/.config/parapet/config.toml
 
 [bar]
 position = "top"        # "top" | "bottom"
 height = 30             # pixels
 monitor = "primary"     # "primary" | integer index
-css = "~/.config/frames/frames.css"   # optional path to custom CSS
+css = "~/.config/parapet/parapet.css"   # optional path to custom CSS
 
 [[widgets]]
 type = "workspaces"
@@ -73,7 +73,7 @@ Global bar configuration. All fields have defaults — `[bar]` is optional.
 | `height` | integer (pixels) | `30` | Bar height in pixels |
 | `monitor` | `"primary"` \| integer | `"primary"` | Monitor to display on. Integer is 0-based GDK monitor index |
 | `css` | string (path) | `None` | Path to user CSS file. `~` is expanded. If absent, built-in default theme is used |
-| `theme` | string | `None` | Named theme to load from `~/.config/frames/themes/<name>.css`. Takes precedence over `css`. See `DOCS/theme-spec.md` |
+| `theme` | string | `None` | Named theme to load from `~/.config/parapet/themes/<name>.css`. Takes precedence over `css`. See `DOCS/theme-spec.md` |
 | `widget_spacing` | integer (pixels) | `4` | Pixel gap between adjacent widgets |
 
 ```toml
@@ -81,7 +81,7 @@ Global bar configuration. All fields have defaults — `[bar]` is optional.
 position = "top"
 height = 28
 monitor = "primary"
-css = "~/.config/frames/frames.css"
+css = "~/.config/parapet/parapet.css"
 widget_spacing = 6
 ```
 
@@ -108,7 +108,7 @@ All widget entries share these fields:
 
 ### 4.2 Widget Types
 
-Each `type` value maps to a variant of the `WidgetKind` enum in `frames_core`. The `type` key is an internal serde tag — each variant wraps a dedicated struct that holds **only** the fields valid for that widget. Fields from another widget type (e.g. `latitude` on a `clock` widget) are **rejected at parse time** by `#[serde(deny_unknown_fields)]` on each variant struct. This means config errors surface immediately with a clear TOML parse error rather than at runtime.
+Each `type` value maps to a variant of the `WidgetKind` enum in `parapet_core`. The `type` key is an internal serde tag — each variant wraps a dedicated struct that holds **only** the fields valid for that widget. Fields from another widget type (e.g. `latitude` on a `clock` widget) are **rejected at parse time** by `#[serde(deny_unknown_fields)]` on each variant struct. This means config errors surface immediately with a clear TOML parse error rather than at runtime.
 
 | `type` value | Rust struct | Description | Default interval |
 |-------------|-------------|-------------|------------------|
@@ -339,7 +339,7 @@ Config loading uses a two-stage gate:
 - `position` must be `"left"`, `"center"`, or `"right"`. Serde rejects other values.
 - Widget-specific fields are validated structurally: each `WidgetKind` variant wraps a dedicated struct annotated with `#[serde(deny_unknown_fields)]`. A field that belongs to a different widget type (e.g. `latitude` on a `clock` widget) is **rejected immediately** with a clear parse error, before `validate()` ever runs.
 
-**Stage 2 — `FramesConfig::validate()` (semantic, called after parse):**
+**Stage 2 — `ParapetConfig::validate()` (semantic, called after parse):**
 
 1. `bar.height` must be > 0
 2. `interval`, when present, must be > 0 (a value of 0 causes a tight polling busy-loop)
@@ -349,7 +349,7 @@ Config loading uses a two-stage gate:
 
 `validate()` also performs `~` / `$HOME` path expansion **in-place** on `bar.css`, `bar.theme`, and disk widget `mount` fields so downstream code always receives expanded absolute paths.
 
-Validation errors are reported via `ConfigError::Validation { field, reason }` and cause the bar to exit with a user-readable message.
+Validation errors are reported via `ParapetConfigError::Validation { field, reason }` and cause the bar to exit with a user-readable message.
 
 ---
 
@@ -360,7 +360,7 @@ Validation errors are reported via `ConfigError::Validation { field, reason }` a
 position = "top"
 height = 28
 monitor = "primary"
-css = "~/.config/frames/frames.css"
+css = "~/.config/parapet/parapet.css"
 widget_spacing = 4
 
 [[widgets]]
@@ -405,6 +405,6 @@ format = "%a %b %d  %H:%M"
 | Topic | Standard |
 |-------|----------|
 | Governance and enforcement | [RULE_OF_LAW.md](RULE_OF_LAW.md) |
-| Config module in frames_core | [ARCHITECTURE.md §4.4](ARCHITECTURE.md) |
+| Config module in parapet_core | [ARCHITECTURE.md §4.4](ARCHITECTURE.md) |
 | Widget data types | [WIDGET_API.md](WIDGET_API.md) |
 | Config round-trip tests | [TESTING_GUIDE.md §6](TESTING_GUIDE.md) |

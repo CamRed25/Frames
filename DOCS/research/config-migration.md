@@ -11,13 +11,13 @@ receive a readable error (or automatic upgrade) when breaking config changes shi
 
 ## Summary
 
-Add a `config_version` integer to `[bar]`, check it in `FramesConfig::load()`,
+Add a `config_version` integer to `[bar]`, check it in `ParapetConfig::load()`,
 and run an in-process migration chain before validation. The chain is a
 `Vec<fn(&mut toml::Value)>` — one function per version step — applied
 sequentially until the document reaches the current schema version. No new
 dependencies are required. The TOML file is rewritten in-place after a
 successful migration with a brief log message. Implementation lives entirely in
-`frames_core` and is display-safe.
+`parapet_core` and is display-safe.
 
 ---
 
@@ -32,7 +32,7 @@ changes that constitute breaking config format changes include:
 - Removing or renaming a field on a per-widget config struct
 - Changing the type of a field (e.g. `interval: String` → `interval: u64`)
 
-Without a migration path, users upgrading Frames get an opaque serde parse error
+Without a migration path, users upgrading Parapet get an opaque serde parse error
 with no actionable guidance.
 
 ---
@@ -54,7 +54,7 @@ missing, the config is inferred as version 1 (the initial unversioned schema).
 /// Integer version of the config file schema.
 ///
 /// Bumped whenever a breaking change is made to the config format. Used by
-/// the migration chain in [`FramesConfig::load()`] to upgrade old files
+/// the migration chain in [`ParapetConfig::load()`] to upgrade old files
 /// automatically before validation.
 ///
 /// Current version: `CONFIG_SCHEMA_VERSION`.
@@ -65,7 +65,7 @@ pub config_version: u32,
 Define a constant in `config.rs`:
 
 ```rust
-/// The config schema version this build of Frames expects.
+/// The config schema version this build of Parapet expects.
 ///
 /// Bump this constant — and add a migration step to `MIGRATIONS` — whenever
 /// a breaking change is made to the TOML config format.
@@ -108,12 +108,12 @@ fn migrate_v1_to_v2(doc: &mut toml::Value) {
 }
 ```
 
-#### FramesConfig::load() integration
+#### ParapetConfig::load() integration
 
 ```rust
-pub fn load(path: &Path) -> Result<Self, ConfigError> {
+pub fn load(path: &Path) -> Result<Self, ParapetConfigError> {
     if !path.exists() {
-        return Err(ConfigError::NotFound { path: path.to_path_buf() });
+        return Err(ParapetConfigError::NotFound { path: path.to_path_buf() });
     }
     let source = std::fs::read_to_string(path)?;
 
@@ -129,11 +129,11 @@ pub fn load(path: &Path) -> Result<Self, ConfigError> {
         .unwrap_or(1);
 
     if file_version > CONFIG_SCHEMA_VERSION {
-        return Err(ConfigError::Validation {
+        return Err(ParapetConfigError::Validation {
             field: "bar.config_version".into(),
             reason: format!(
                 "config version {} is newer than this build supports ({}); \
-                 upgrade Frames or downgrade your config",
+                 upgrade Parapet or downgrade your config",
                 file_version, CONFIG_SCHEMA_VERSION
             ),
         });
@@ -167,7 +167,7 @@ pub fn load(path: &Path) -> Result<Self, ConfigError> {
         );
     }
 
-    // 5. Deserialize the (possibly migrated) document into FramesConfig.
+    // 5. Deserialize the (possibly migrated) document into ParapetConfig.
     let mut config: Self = toml::from_str(&toml::to_string(&doc)?)?;
     config.validate()?;
     Ok(config)
@@ -208,7 +208,7 @@ rename).
 
 ### Option C — Semver string field (`config_version = "1.0.0"`)
 
-Adds complexity without benefit. Integer version is sufficient since Frames
+Adds complexity without benefit. Integer version is sufficient since Parapet
 controls the only schema; semver is only useful when there are third parties
 implementing the format. Rejected.
 
@@ -216,8 +216,8 @@ implementing the format. Rejected.
 
 ## Recommendation
 
-**Option A.** The implementation is contained to `frames_core/src/config.rs`
-(plus a new sibling `frames_core/src/migrations.rs`). No new dependencies.
+**Option A.** The implementation is contained to `parapet_core/src/config.rs`
+(plus a new sibling `parapet_core/src/migrations.rs`). No new dependencies.
 Current schema starts at `CONFIG_SCHEMA_VERSION = 1`. The `MIGRATIONS` slice is
 empty at first; the infrastructure merely validates the version field and
 produces a readable error. The first real migration function is added when Phase
@@ -228,10 +228,10 @@ produces a readable error. The first real migration function is added when Phase
 1. Add `config_version: u32` to `BarConfig` with `#[serde(default = "...")]`
    returning `1`.
 2. Add `pub const CONFIG_SCHEMA_VERSION: u32 = 1` to `config.rs`.
-3. Create `crates/frames_core/src/migrations.rs` with an empty
+3. Create `crates/parapet_core/src/migrations.rs` with an empty
    `pub static MIGRATIONS: &[MigrationFn] = &[]` and an explanatory comment.
-4. Refactor `FramesConfig::load()` as shown above.
-5. Extend `ConfigError` with a `ConfigTooNew` variant for the "file version >
+4. Refactor `ParapetConfig::load()` as shown above.
+5. Extend `ParapetConfigError` with a `ConfigTooNew` variant for the "file version >
    binary version" case (distinct from `Validation`, giving callers a typed
    handle).
 6. Add round-trip tests:
@@ -246,7 +246,7 @@ produces a readable error. The first real migration function is added when Phase
 `CONFIG_MODEL.md §4.1` (`[bar]` fields table) should gain a row for
 `config_version: integer (default 1, auto-managed)` once this is implemented.
 
-`ARCHITECTURE.md §4.1` should note that `FramesConfig::load` runs the migration
+`ARCHITECTURE.md §4.1` should note that `ParapetConfig::load` runs the migration
 chain before deserialization.
 
 ---
@@ -255,7 +255,7 @@ chain before deserialization.
 
 - `toml` crate 0.8 docs — `toml::Value`, `to_string_pretty`: confirmed available
   without additional features
-- `frames_core/src/config.rs`: current `load()` and `validate()` structure
+- `parapet_core/src/config.rs`: current `load()` and `validate()` structure
 - `DOCS/research/config-overhaul.md §Problem 5`: original discovery of this need
 - `DOCS/futures.md`: "Config migration infrastructure" entry that prompted this research
 

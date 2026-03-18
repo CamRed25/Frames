@@ -4,7 +4,7 @@
 
 ## Question
 
-What concrete improvements can be made to the Frames config system — structure, validation, usability, and tooling — and what is the right phased approach?
+What concrete improvements can be made to the Parapet config system — structure, validation, usability, and tooling — and what is the right phased approach?
 
 ---
 
@@ -126,14 +126,14 @@ It misses:
 - `mount` that isn't an absolute path
 - `warn_threshold` / `crit_threshold` outside 0–100
 
-**Option A — Extend `FramesConfig::validate()` (recommended, easy wins)**
+**Option A — Extend `ParapetConfig::validate()` (recommended, easy wins)**
 
 Add these checks directly in the existing `validate()` method:
 
 ```rust
 // Reject zero intervals
 if w.interval == Some(0) {
-    return Err(ConfigError::Validation {
+    return Err(ParapetConfigError::Validation {
         field: format!("widgets[{i}].interval"),
         reason: "must be > 0".into(),
     });
@@ -164,18 +164,18 @@ Currently a user editing `config.toml` in VS Code has no autocomplete, no hover 
 `schemars = "~0.8"` (MIT, 12.7M downloads) derives JSON Schema from Rust types via `#[derive(JsonSchema)]`. With the typed `WidgetKind` enum, the generated schema would correctly show which fields are available for each widget type.
 
 Steps:
-1. Add `schemars` to `frames_core` (no display dependency — it's a derive macro)
-2. `#[derive(JsonSchema)]` on `FramesConfig`, `BarConfig`, `WidgetConfig`, and all per-widget config types
-3. Add a `frames_bar --dump-schema` subcommand that writes the schema to stdout
+1. Add `schemars` to `parapet_core` (no display dependency — it's a derive macro)
+2. `#[derive(JsonSchema)]` on `ParapetConfig`, `BarConfig`, `WidgetConfig`, and all per-widget config types
+3. Add a `parapet_bar --dump-schema` subcommand that writes the schema to stdout
 4. Users drop the schema in their `.vscode/` folder and add this to `settings.json`:
    ```json
    "evenBetterToml.schema.associations": {
-     ".*/frames/config.toml": "./frames-config.schema.json"
+     ".*/parapet/config.toml": "./parapet-config.schema.json"
    }
    ```
    Or use `taplo`'s inline schema association comment in the config:
    ```toml
-   #:schema https://example.com/frames-config.schema.json
+   #:schema https://example.com/parapet-config.schema.json
    ```
 
 This gives:
@@ -184,7 +184,7 @@ This gives:
 - Inline error squiggles for unknown fields or wrong types
 - Free — no runtime cost, schema generation is a compile-time derive
 
-`taplo` (MIT) is the TOML language server used by the "Even Better TOML" VS Code extension — no installation step beyond enabling the existing extension. The `taplo-cli` binary can also validate a config file from the command line: `taplo check --schema frames.schema.json ~/.config/frames/config.toml`.
+`taplo` (MIT) is the TOML language server used by the "Even Better TOML" VS Code extension — no installation step beyond enabling the existing extension. The `taplo-cli` binary can also validate a config file from the command line: `taplo check --schema parapet.schema.json ~/.config/parapet/config.toml`.
 
 **Option B — Manually document the config as JSON Schema YAML**
 
@@ -196,15 +196,15 @@ Tedious to keep in sync, error-prone. Not recommended.
 
 New users must write a config file from scratch or copy the example in `CONFIG_MODEL.md §6`.
 
-**Option A — `frames_bar --init-config` subcommand (recommended)**
+**Option A — `parapet_bar --init-config` subcommand (recommended)**
 
-Writes a well-commented starter config to `~/.config/frames/config.toml` (or the path in `FRAMES_CONFIG`) if the file does not exist. Exits with an error if the file already exists to prevent accidental overwrite.
+Writes a well-commented starter config to `~/.config/parapet/config.toml` (or the path in `PARAPET_CONFIG`) if the file does not exist. Exits with an error if the file already exists to prevent accidental overwrite.
 
 The config written is the same as the `CONFIG_MODEL.md §6` example, rendered from a `const` string baked into the binary. No external file required.
 
 ```bash
-frames_bar --init-config
-# → Wrote config to /home/cam/.config/frames/config.toml
+parapet_bar --init-config
+# → Wrote config to /home/cam/.config/parapet/config.toml
 ```
 
 Low implementation cost: ~20 lines in `main.rs`, no new dependencies.
@@ -229,7 +229,7 @@ This is non-trivial and belongs in a separate plan. File in `futures.md`.
 
 ### Problem 6 — Environment Variable Expansion (Minor)
 
-Only `~` is expanded in `bar.css`. The `FRAMES_CONFIG` env var override works, but inside the config file itself, `$HOME` inside a path is not expanded.
+Only `~` is expanded in `bar.css`. The `PARAPET_CONFIG` env var override works, but inside the config file itself, `$HOME` inside a path is not expanded.
 
 **Option A — Expand `$HOME` / `~` in all path-type string fields at validation time**
 
@@ -246,7 +246,7 @@ Do this in two phases:
 | Item | Effort | Value |
 |------|--------|-------|
 | Extend `validate()` with zero-interval, GPS range, and threshold range checks | Low | High |
-| Add `frames_bar --init-config` subcommand | Low | High |
+| Add `parapet_bar --init-config` subcommand | Low | High |
 | Expand `$HOME` / `~` in all path fields | Low | Medium |
 | Add `schemars` derives + `--dump-schema` subcommand | Medium | High |
 
@@ -279,7 +279,7 @@ The single most impactful change is the **`WidgetKind` enum** (Phase 2) because 
 - [`schemars` crate](https://docs.rs/schemars): JSON Schema derive macro — what it contributed: schema generation approach
 - [`taplo` TOML tooling](https://taplo.tamasfe.dev): TOML LSP and CLI validator — what it contributed: editor integration strategy
 - [`validator` crate](https://docs.rs/validator): field-level validation derives — considered and deferred (unnecessary dep for current scale)
-- [`figment` crate](https://docs.rs/figment): layered config (file + env + CLI) — considered as full config replacement; overkill for current single-file model; worth revisiting if Frames gains a CLI-override requirement
+- [`figment` crate](https://docs.rs/figment): layered config (file + env + CLI) — considered as full config replacement; overkill for current single-file model; worth revisiting if Parapet gains a CLI-override requirement
 - Serde documentation on `#[serde(tag = "type")]` internally-tagged enums: confirms the discriminant field (`type`) survives round-trip through TOML
 
 ---
@@ -287,4 +287,4 @@ The single most impactful change is the **`WidgetKind` enum** (Phase 2) because 
 ## Open Questions
 
 1. Should the `WidgetKind` typed enum be a Phase 2 internal refactor only, or should it be done as part of a larger v0.2.0 config schema stabilisation? Affects whether the existing TOML format is considered "stable" before migration.
-2. Should `--dump-schema` write a versioned schema URL (e.g. `https://github.com/CamRed25/Frames/releases/download/v0.2.0/config.schema.json`) so users can reference a pinned URL instead of generating locally?
+2. Should `--dump-schema` write a versioned schema URL (e.g. `https://github.com/CamRed25/Parapet/releases/download/v0.2.0/config.schema.json`) so users can reference a pinned URL instead of generating locally?

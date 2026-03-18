@@ -1,4 +1,4 @@
-# Frames — Architecture
+# Parapet — Architecture
 
 > **Scope:** Crate structure, module organization, dependency graph, and system design.
 > **Last Updated:** Mar 17, 2026
@@ -7,13 +7,13 @@
 
 ## 1. Design Philosophy
 
-Frames is a ground-up Linux-native status bar for the Cinnamon desktop. There is no upstream codebase to inherit from. Every architectural decision is deliberate.
+Parapet is a ground-up Linux-native status bar for the Cinnamon desktop. There is no upstream codebase to inherit from. Every architectural decision is deliberate.
 
 **Core principles:**
 
 - **One language boundary** — Rust top to bottom except the GTK3 C library underneath `gtk-rs`. No Python layer, no shell scripts doing the heavy lifting.
-- **Display isolation** — `frames_core` is a pure library with no dependency on GTK, GDK, X11, or any display system. All display logic lives in `frames_bar`.
-- **Widget data, not widget widgets** — `frames_core` produces *data* (CPU %, clock string, battery level). `frames_bar` turns that data into GTK3 widgets. The boundary is strict.
+- **Display isolation** — `parapet_core` is a pure library with no dependency on GTK, GDK, X11, or any display system. All display logic lives in `parapet_bar`.
+- **Widget data, not widget widgets** — `parapet_core` produces *data* (CPU %, clock string, battery level). `parapet_bar` turns that data into GTK3 widgets. The boundary is strict.
 - **Config-driven** — Every visual and behavioral property is expressed in TOML. Hard-coded values are a bug.
 - **Polling, not pushing** — Widgets are updated on a timer. There is no IPC bus or event system to synchronize.
 
@@ -22,11 +22,11 @@ Frames is a ground-up Linux-native status bar for the Cinnamon desktop. There is
 ## 2. Workspace Structure
 
 ```
-frames/
+parapet/
 ├── Cargo.toml              ← workspace root
 ├── crates/
-│   ├── frames_core/        ← pure library: widget data, system info, config, errors
-│   └── frames_bar/         ← GTK3 binary: bar window, widget renderers, X11 EWMH
+│   ├── parapet_core/        ← pure library: widget data, system info, config, errors
+│   └── parapet_bar/         ← GTK3 binary: bar window, widget renderers, X11 EWMH
 ├── standards/              ← All .md standards documents
 ├── DOCS/                   ← Governance and planning documents
 │   ├── futures.md          ← Ideas, debt, and completed work log
@@ -36,22 +36,22 @@ frames/
 └── doa/                    ← Archived code (never deleted)
 ```
 
-**Planned future crates:** None currently. Additional crates are extracted only when a module inside `frames_core` has a proven, distinct dependency surface. Do not extract speculatively.
+**Planned future crates:** None currently. Additional crates are extracted only when a module inside `parapet_core` has a proven, distinct dependency surface. Do not extract speculatively.
 
 ---
 
 ## 3. Dependency Graph
 
 ```
-frames_bar
-    ├── frames_core
+parapet_bar
+    ├── parapet_core
     ├── gtk (~0.18, GTK3 bindings)
     ├── gdk (~0.18, transitive)
     ├── glib (~0.18, transitive)
     ├── anyhow
     └── tracing-subscriber
 
-frames_core
+parapet_core
     ├── sysinfo (~0.30, CPU/RAM/network stats)
     ├── chrono (~0.4, date/time)
     ├── serde + toml (config serialization)
@@ -64,18 +64,18 @@ frames_core
 ```
 
 **Dependency direction rules:**
-- `frames_bar` may depend on `frames_core`. Never the reverse.
-- `frames_core` must not depend on `gtk`, `gdk`, `glib`, `x11`, or any crate that requires a display server.
-- `frames_bar` is the only crate that may talk to GTK3 or X11.
+- `parapet_bar` may depend on `parapet_core`. Never the reverse.
+- `parapet_core` must not depend on `gtk`, `gdk`, `glib`, `x11`, or any crate that requires a display server.
+- `parapet_bar` is the only crate that may talk to GTK3 or X11.
 
 ---
 
-## 4. frames_core — Module Structure
+## 4. parapet_core — Module Structure
 
 ### 4.1 Top-Level Modules
 
 ```
-frames_core/
+parapet_core/
 ├── src/
 │   ├── lib.rs
 │   ├── widget.rs       ← Widget trait + WidgetData enum (uniform widget interface)
@@ -91,10 +91,10 @@ frames_core/
 │   │   ├── brightness.rs ← Screen backlight percentage via /sys/class/backlight/
 │   │   ├── weather.rs  ← Current conditions from Open-Meteo API via ureq
 │   │   ├── media.rs    ← MPRIS2 playback info via zbus (D-Bus session bus)
-│   │   └── workspaces.rs ← Workspace count/name stubs (X11 query handled in frames_bar)
+│   │   └── workspaces.rs ← Workspace count/name stubs (X11 query handled in parapet_bar)
 │   ├── poll.rs         ← Poller — interval-based widget update scheduling
-│   ├── config.rs       ← FramesConfig, BarConfig, WidgetConfig, WidgetKind (+ 13 per-widget structs) — TOML config; ConfigWatcher — notify-backed file watcher for hot-reload
-│   └── error.rs        ← FramesError — crate-level error types (thiserror)
+│   ├── config.rs       ← ParapetConfig, BarConfig, WidgetConfig, WidgetKind (+ 13 per-widget structs) — TOML config; ConfigWatcher — notify-backed file watcher for hot-reload
+│   └── error.rs        ← ParapetError — crate-level error types (thiserror)
 ```
 
 ### 4.2 widget.rs — Widget Trait and Data
@@ -107,7 +107,7 @@ pub trait Widget: Send + Sync {
     fn name(&self) -> &str;
 
     /// Refresh internal state and return the latest data snapshot.
-    fn update(&mut self) -> Result<WidgetData, FramesError>;
+    fn update(&mut self) -> Result<WidgetData, ParapetError>;
 }
 ```
 
@@ -134,7 +134,7 @@ pub enum WidgetData {
 
 ### 4.3 poll.rs — Polling Infrastructure
 
-`Poller` drives widget updates. It is a pure Rust struct — no GTK, no glib timers. The actual timer registration (`glib::timeout_add_local`) lives in `frames_bar`, which calls `Poller::poll()` on the glib main thread.
+`Poller` drives widget updates. It is a pure Rust struct — no GTK, no glib timers. The actual timer registration (`glib::timeout_add_local`) lives in `parapet_bar`, which calls `Poller::poll()` on the glib main thread.
 
 ```
 Poller
@@ -145,10 +145,10 @@ Poller
 
 ### 4.4 config.rs — TOML Configuration
 
-Config is loaded from `~/.config/frames/config.toml`. The structure:
+Config is loaded from `~/.config/parapet/config.toml`. The structure:
 
 ```
-FramesConfig
+ParapetConfig
 ├── bar: BarConfig           ← position, height, monitor, CSS path
 └── widgets: Vec<WidgetConfig>  ← ordered list of widget definitions
     └── kind: WidgetKind     ← internal serde tag; one of 13 typed variants
@@ -160,7 +160,7 @@ FramesConfig
 
 `WidgetConfig` holds the common fields (`position`, `interval`, `label`, `on_click`, etc.) shared by all widgets, plus a `kind: WidgetKind` field that carries the widget-specific fields. `WidgetKind` is an internally-tagged serde enum (`#[serde(tag = "type")]`): the `type` key in TOML selects the variant and each variant struct has `#[serde(deny_unknown_fields)]` so misplaced fields are rejected at parse time rather than silently ignored.
 
-The `WidgetKind` enum drives dispatch in `frames_bar::main::build_widget()` — the match exhaustiveness guarantees every widget type has a renderer.
+The `WidgetKind` enum drives dispatch in `parapet_bar::main::build_widget()` — the match exhaustiveness guarantees every widget type has a renderer.
 
 See CONFIG_MODEL.md for full field documentation.
 
@@ -168,9 +168,9 @@ See CONFIG_MODEL.md for full field documentation.
 
 ```rust
 #[derive(Debug, thiserror::Error)]
-pub enum FramesError {
+pub enum ParapetError {
     #[error("config error: {0}")]
-    Config(#[from] ConfigError),
+    Config(#[from] ParapetConfigError),
 
     #[error("sysinfo error: {0}")]
     SysInfo(String),
@@ -191,10 +191,10 @@ pub enum FramesError {
 
 ---
 
-## 5. frames_bar — Module Structure
+## 5. parapet_bar — Module Structure
 
 ```
-frames_bar/
+parapet_bar/
 ├── src/
 │   ├── main.rs         ← CLI entry point: GTK init, config load, Bar construction, gtk::main()
 │   ├── bar.rs          ← Bar struct: GtkWindow + X11 EWMH setup + multi-monitor support
@@ -217,9 +217,9 @@ frames_bar/
 ```
 
 **UI rules:**
-- No business logic in GTK renderers — all data computation lives in `frames_core`.
+- No business logic in GTK renderers — all data computation lives in `parapet_core`.
 - Every renderer receives `&WidgetData` and updates its GTK widget accordingly.
-- GTK main thread must never block — all `frames_core` polling is non-blocking.
+- GTK main thread must never block — all `parapet_core` polling is non-blocking.
 
 > **Full GTK3 conventions, CSS rules, and X11 EWMH setup:** [UI_GUIDE.md](UI_GUIDE.md)
 
@@ -233,7 +233,7 @@ frames_bar/
 main()
     │
     ▼
-Load FramesConfig from ~/.config/frames/config.toml
+Load ParapetConfig from ~/.config/parapet/config.toml
     │
     ▼
 gtk::init() — initialize GTK3
@@ -272,7 +272,7 @@ Poller::poll() — calls Widget::update() for each due widget
 Returns Vec<(widget_name, WidgetData)> for changed widgets
     │
     ▼
-frames_bar: for each changed widget, call renderer.update(data)
+parapet_bar: for each changed widget, call renderer.update(data)
     │
     ▼
 Renderer updates GtkLabel/GtkProgressBar text/value
@@ -305,11 +305,11 @@ Cinnamon uses GTK3. A GTK4 bar would require running in a separate process and c
 
 ### 8.2 X11 Only (for now)
 
-Cinnamon does not support Wayland as of this writing. Frames targets X11 exclusively. Wayland support (via layer-shell) is tracked in `DOCS/futures.md` as a future consideration.
+Cinnamon does not support Wayland as of this writing. Parapet targets X11 exclusively. Wayland support (via layer-shell) is tracked in `DOCS/futures.md` as a future consideration.
 
 ### 8.3 No Daemon / IPC
 
-Frames is a single process. There is no daemon, no IPC socket, and no reload protocol. Config hot-reload is handled by watching the file with `notify` and restarting the relevant widgets. A full restart is acceptable for major config changes.
+Parapet is a single process. There is no daemon, no IPC socket, and no reload protocol. Config hot-reload is handled by watching the file with `notify` and restarting the relevant widgets. A full restart is acceptable for major config changes.
 
 ### 8.4 sysinfo for System Stats
 

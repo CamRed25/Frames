@@ -24,7 +24,7 @@ most refreshes.
 
 ## Current State
 
-`crates/frames_core/src/widgets/volume.rs` — `read_volume()`:
+`crates/parapet_core/src/widgets/volume.rs` — `read_volume()`:
 
 ```rust
 // call 1 — volume percentage
@@ -65,18 +65,18 @@ Sink #0
 Parse the same fields from a single output block:
 
 ```rust
-fn read_volume() -> Result<VolumeData, FramesError> {
+fn read_volume() -> Result<VolumeData, ParapetError> {
     let output = Command::new("pactl")
         .args(["get-sink-info", "@DEFAULT_SINK@"])
         .output()
-        .map_err(|e| FramesError::Io(e))?;
+        .map_err(|e| ParapetError::Io(e))?;
     let text = String::from_utf8_lossy(&output.stdout);
     let volume_pct = parse_volume_pct(&text)?;
     let muted = parse_mute(&text)?;
     Ok(VolumeData { volume_pct, muted })
 }
 
-fn parse_volume_pct(text: &str) -> Result<u8, FramesError> {
+fn parse_volume_pct(text: &str) -> Result<u8, ParapetError> {
     // "Volume: front-left: 45875 /  70% / …"
     text.lines()
         .find(|l| l.trim_start().starts_with("Volume:"))
@@ -85,15 +85,15 @@ fn parse_volume_pct(text: &str) -> Result<u8, FramesError> {
              .map(|s| s.trim().trim_end_matches('%'))
         })
         .and_then(|s| s.parse::<u8>().ok())
-        .ok_or_else(|| FramesError::Parse("volume percentage".into()))
+        .ok_or_else(|| ParapetError::Parse("volume percentage".into()))
 }
 
-fn parse_mute(text: &str) -> Result<bool, FramesError> {
+fn parse_mute(text: &str) -> Result<bool, ParapetError> {
     // "Mute: yes"
     text.lines()
         .find(|l| l.trim_start().starts_with("Mute:"))
         .map(|l| l.contains("yes"))
-        .ok_or_else(|| FramesError::Parse("mute state".into()))
+        .ok_or_else(|| ParapetError::Parse("mute state".into()))
 }
 ```
 
@@ -145,7 +145,7 @@ pub struct VolumeWidget {
 }
 
 impl VolumeWidget {
-    pub fn new() -> Result<Self, FramesError> {
+    pub fn new() -> Result<Self, ParapetError> {
         let (tx, rx) = std::sync::mpsc::channel();
         let handle = std::thread::spawn(move || {
             subscribe_loop(tx);
@@ -178,7 +178,7 @@ fn subscribe_loop(tx: std::sync::mpsc::Sender<VolumeData>) {
 `Widget::update()` in this model becomes:
 
 ```rust
-fn update(&mut self) -> Result<WidgetData, FramesError> {
+fn update(&mut self) -> Result<WidgetData, ParapetError> {
     // Drain channel; use latest if multiple events arrived since last tick.
     while let Ok(data) = self.rx.try_recv() {
         self.cached = data;
@@ -203,8 +203,8 @@ fn update(&mut self) -> Result<WidgetData, FramesError> {
   Acceptable behaviour (same value is a no-op in the renderer) but worth noting.
 - `_thread_handle` is intentionally not joined — the widget drop scenario during
   bar teardown could block. Use a detached thread or a stop signal instead.
-- `frames_core` restriction: `subscribe_loop` is pure process I/O + no GTK
-  imports — safe to keep in `frames_core`.
+- `parapet_core` restriction: `subscribe_loop` is pure process I/O + no GTK
+  imports — safe to keep in `parapet_core`.
 
 **Verdict: The right long-term answer.** Implement immediately after Option A
 ships and is confirmed stable. Plan as a follow-on task.
@@ -244,7 +244,7 @@ interaction (no C library deps for audio). Out of scope.
 ## Recommendation
 
 **Ship Option A immediately** (single `pactl get-sink-info` call). It is a
-self-contained change to `crates/frames_core/src/widgets/volume.rs`.
+self-contained change to `crates/parapet_core/src/widgets/volume.rs`.
 
 **Plan Option B as a follow-on task.** It requires:
 - Making `VolumeWidget` stateful (thread + channel)
@@ -253,7 +253,7 @@ self-contained change to `crates/frames_core/src/widgets/volume.rs`.
 - Adding a `WidgetData::Volume` variant field `fresh: bool` is **not** needed —
   the renderer already handles identical successive values as no-ops
 
-Both options live entirely in `frames_core` and require no display code.
+Both options live entirely in `parapet_core` and require no display code.
 
 ---
 
@@ -271,8 +271,8 @@ that own background threads. When Option B is implemented, add a note:
 
 ## Sources
 
-- `crates/frames_core/src/widgets/volume.rs`: current two-call implementation
-- `crates/frames_bar/src/widgets/volume.rs`: renderer and `VolumeConfig`
+- `crates/parapet_core/src/widgets/volume.rs`: current two-call implementation
+- `crates/parapet_bar/src/widgets/volume.rs`: renderer and `VolumeConfig`
 - `pactl(1)` man page: `get-sink-info`, `subscribe` subcommand output formats
 - PipeWire D-Bus compatibility notes: PipeWire issue tracker (no stable PA Core1
   D-Bus support under `pipewire-pulse`)

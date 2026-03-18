@@ -1,15 +1,15 @@
-# Frames Theme Specification
+# Parapet Theme Specification
 
-> **Scope:** Community-shareable theme pack format for `frames_bar`.
+> **Scope:** Community-shareable theme pack format for `parapet_bar`.
 > **Last Updated:** 2026-03-17
-> **Requires:** Frames ≥ 0.1.0
+> **Requires:** Parapet ≥ 0.1.0
 
 ---
 
 ## 1. Overview
 
-A Frames theme is a CSS file (or small set of CSS files) placed in
-`~/.config/frames/themes/`. The active theme is selected via the `[bar]`
+A Parapet theme is a CSS file (or small set of CSS files) placed in
+`~/.config/parapet/themes/`. The active theme is selected via the `[bar]`
 config field or the `--theme` CLI flag:
 
 ```toml
@@ -18,10 +18,10 @@ theme = "gruvbox"
 ```
 
 ```bash
-frames_bar --theme gruvbox
+parapet_bar --theme gruvbox
 ```
 
-The bar searches for `~/.config/frames/themes/gruvbox.css` at startup. If the
+The bar searches for `~/.config/parapet/themes/gruvbox.css` at startup. If the
 file does not exist, the built-in default theme is used and a warning is logged.
 
 ---
@@ -29,11 +29,11 @@ file does not exist, the built-in default theme is used and a warning is logged.
 ## 2. Directory Layout
 
 ```
-~/.config/frames/themes/
+~/.config/parapet/themes/
 ├── gruvbox.css          ← base theme (required)
 ├── gruvbox-dark.css     ← dark variant (optional; auto-selected)
 ├── gruvbox-light.css    ← light variant (optional; auto-selected)
-└── gruvbox.toml         ← metadata (optional; not read by frames_bar at runtime)
+└── gruvbox.toml         ← metadata (optional; not read by parapet_bar at runtime)
 ```
 
 ### Base file
@@ -43,7 +43,7 @@ file does not exist, the built-in default theme is used and a warning is logged.
 ### Dark and light variants
 
 `<name>-dark.css` and `<name>-light.css` — Optional. When GTK's
-`gtk-application-prefer-dark-theme` setting is `true`, `frames_bar` appends
+`gtk-application-prefer-dark-theme` setting is `true`, `parapet_bar` appends
 `-dark` to the name and checks whether that file exists; if so, it loads the
 dark variant instead. When the preference is `false`, `-light` is tried.
 
@@ -52,12 +52,12 @@ If the variant file does not exist, the base `<name>.css` is used.
 ### Metadata file (optional)
 
 `<name>.toml` — Metadata for tooling and human readers. Not read by
-`frames_bar` itself in v0.1.x.
+`parapet_bar` itself in v0.1.x.
 
 ```toml
 name = "gruvbox"
 author = "your-name"
-description = "Gruvbox-inspired dark theme for Frames."
+description = "Gruvbox-inspired dark theme for Parapet."
 frames_min_version = "0.1.0"
 ```
 
@@ -69,7 +69,7 @@ Theme names must match `[a-z0-9_-]+`:
 
 - Lowercase ASCII letters, digits, underscores, and hyphens only.
 - No path separators (`/`), dots (`.`), or non-ASCII characters.
-- `frames_bar` rejects names containing `/` or `..` with a warning and falls
+- `parapet_bar` rejects names containing `/` or `..` with a warning and falls
   back to the built-in default (path traversal guard).
 
 Valid: `dark`, `gruvbox`, `solarized-light`, `my_theme_01`
@@ -121,10 +121,10 @@ These class names are the CSS API surface — do not rename them without updatin
 
 | Element | CSS class |
 |---------|-----------|
-| Bar root `GtkBox` | `.frames-bar` |
-| Left section | `.frames-left` |
-| Centre section | `.frames-center` |
-| Right section | `.frames-right` |
+| Bar root `GtkBox` | `.parapet-bar` |
+| Left section | `.parapet-left` |
+| Centre section | `.parapet-center` |
+| Right section | `.parapet-right` |
 | Any widget container | `.widget` |
 | Clock widget | `.widget-clock` |
 | CPU widget | `.widget-cpu` |
@@ -145,7 +145,7 @@ These class names are the CSS API surface — do not rename them without updatin
 
 ### Per-widget instance targeting (`extra_class`)
 
-Any `[[widgets]]` entry may carry an `extra_class` field that `frames_bar`
+Any `[[widgets]]` entry may carry an `extra_class` field that `parapet_bar`
 applies to the widget's outermost GTK container:
 
 ```toml
@@ -172,7 +172,7 @@ widget source code.
 ## 6. Hot-Reload
 
 When a theme file is loaded from disk (named theme or raw `bar.css` path),
-`frames_bar` watches the file for changes. Editing and saving the CSS file
+`parapet_bar` watches the file for changes. Editing and saving the CSS file
 causes the bar to reapply the theme within ~500 ms — no bar restart needed.
 
 **Known limitation:** If the config file's `bar.theme` field is changed to a
@@ -189,5 +189,5 @@ To share a theme, distribute:
 - `<name>-dark.css` and/or `<name>-light.css` (recommended)
 - `<name>.toml` (recommended — helps users know what version they need)
 
-Users install by placing the files in `~/.config/frames/themes/` and setting
+Users install by placing the files in `~/.config/parapet/themes/` and setting
 `theme = "<name>"` in their `config.toml`.

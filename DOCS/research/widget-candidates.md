@@ -12,7 +12,7 @@ ship and what users most commonly request?
 The clearest next four widgets are **CPU temperature**, **disk usage**, **active window
 title**, and **custom/script** — all require zero new dependencies. Temperature, disk,
 load, and uptime can all be read from `sysinfo` 0.30 (already a workspace dep). Active
-window and keyboard layout are X11-only and must live entirely in `frames_bar`. A
+window and keyboard layout are X11-only and must live entirely in `parapet_bar`. A
 custom/script widget unlocks unlimited user-defined displays with no new crate work at
 all.
 
@@ -22,7 +22,7 @@ all.
 
 ### Comparison matrix: what popular bars ship
 
-| Widget | Polybar | Waybar | i3bar | Frames (today) |
+| Widget | Polybar | Waybar | i3bar | Parapet (today) |
 |--------|:-------:|:------:|:-----:|:--------------:|
 | Clock | ✓ | ✓ | ✓ | ✓ |
 | CPU usage | ✓ | ✓ | ✓ | ✓ |
@@ -65,7 +65,7 @@ The most useful display is the CPU *package* temperature: find the component who
 label contains `"Package"` or defaults to the highest `Core` reading. Laptop
 users also want to know when they are near `critical`.
 
-**Implementation tier:** `frames_core` — no display deps at all.
+**Implementation tier:** `parapet_core` — no display deps at all.
 
 **New deps:** None. `sysinfo` ~0.30 already in workspace.
 
@@ -101,7 +101,7 @@ threads.
 
 Used = total − available. Percent = used / total.
 
-**Implementation tier:** `frames_core`.
+**Implementation tier:** `parapet_core`.
 
 **New deps:** None.
 
@@ -125,7 +125,7 @@ Safe to skip any disk with `total_space == 0`.
 ### Option C: Active Window Title (`active_window`)
 
 **Popularity:** Present in virtually every real-world Polybar/Waybar config screenshot.
-Extremely high demand. It is the single most common "why doesn't Frames show the focused
+Extremely high demand. It is the single most common "why doesn't Parapet show the focused
 window?" request category across bar communities.
 
 **Data source:** X11 EWMH properties on the root window and the active client window:
@@ -134,13 +134,13 @@ window?" request category across bar communities.
 
 `gdk::property_get()` already handles both reads per ADR-004. No new crate needed.
 
-**Implementation tier:** `frames_bar` only — X11 calls cannot enter `frames_core`.
+**Implementation tier:** `parapet_bar` only — X11 calls cannot enter `parapet_core`.
 
 This means the active window widget **cannot use the standard `Poller` pipeline**. It
 needs either:
 - **A**: A dedicated glib timer in the bar (same pattern as the existing `WorkspacesWidget`
   self-poll, which is already noted as an inconsistency in `futures.md`)
-- **B**: A new `WidgetData::Text(String)` variant in `frames_core` so a stub core widget
+- **B**: A new `WidgetData::Text(String)` variant in `parapet_core` so a stub core widget
   exists for the data flow but reads are still taken over by the bar renderer via X11
 
 Option A is simpler and keeps the inconsistency contained. Option B is cleaner long-term
@@ -173,7 +173,7 @@ natively support: VPN status, package updates, todo count, uptime, etc.
 **Data source:** `std::process::Command`, capturing stdout. One-shot or continuous
 (`tail -f`-style is out of scope; one-shot poll only).
 
-**Implementation tier:** `frames_core`. The core widget spawns a child process and
+**Implementation tier:** `parapet_core`. The core widget spawns a child process and
 stores the trimmed stdout string in `WidgetData::Script { text: String }`. On non-zero
 exit or empty output the widget optionally hides (renders blank) or shows the last
 successful value.
@@ -182,7 +182,7 @@ successful value.
 
 **Security note:** The command is specified in user-controlled `config.toml`, not
 injected from an external source. This is the same trust model as `on_click`. No
-sanitisation needed beyond what the shell already provides. Frames should **not** run
+sanitisation needed beyond what the shell already provides. Parapet should **not** run
 the script through `sh -c` with a root-inherited environment — using `Command::new`
 with explicit args and inheriting the user environment is correct.
 
@@ -220,9 +220,9 @@ target non-English setups.
 Alternative: Use GDK's `gdk::Keymap::get_direction()` — but this does not expose the
 layout name string, only text direction. Using `setxkbmap` is the standard approach.
 
-**Implementation tier:** `frames_bar` only (spawns an X11-related subprocess). Or
-`frames_core` (subprocess is headless-safe though keymaps are display-adjacent).
-Verdict: put the polling in `frames_core` since `setxkbmap -query` has no display
+**Implementation tier:** `parapet_bar` only (spawns an X11-related subprocess). Or
+`parapet_core` (subprocess is headless-safe though keymaps are display-adjacent).
+Verdict: put the polling in `parapet_core` since `setxkbmap -query` has no display
 dependency — it reads from the X server but is a plain subprocess from Rust's
 perspective. The `WidgetData` variant can carry the layout string.
 
@@ -287,12 +287,12 @@ BlueZ 5.48+ and is not universally present.
 
 | # | Widget | Layer | Key API |
 |---|--------|-------|---------|
-| 1 | `temperature` | `frames_core` | `sysinfo::Components` |
-| 2 | `disk` | `frames_core` | `sysinfo::Disks` |
-| 3 | `active_window` | `frames_bar` only | `gdk::property_get` EWMH |
-| 4 | `script` | `frames_core` | `std::process::Command` |
+| 1 | `temperature` | `parapet_core` | `sysinfo::Components` |
+| 2 | `disk` | `parapet_core` | `sysinfo::Disks` |
+| 3 | `active_window` | `parapet_bar` only | `gdk::property_get` EWMH |
+| 4 | `script` | `parapet_core` | `std::process::Command` |
 
-These four cover the biggest gap between Frames and the Polybar/Waybar feature matrix.
+These four cover the biggest gap between Parapet and the Polybar/Waybar feature matrix.
 They require no new crates, no new unsafe blocks, and fit cleanly into the existing
 widget architecture.
 
@@ -300,8 +300,8 @@ widget architecture.
 
 | # | Widget | Layer | Note |
 |---|--------|-------|------|
-| 5 | `keyboard` | `frames_core` | Subprocess `setxkbmap`, X11-adjacent |
-| 6 | `bluetooth` | `frames_core` | `zbus` already present |
+| 5 | `keyboard` | `parapet_core` | Subprocess `setxkbmap`, X11-adjacent |
+| 6 | `bluetooth` | `parapet_core` | `zbus` already present |
 
 **Defer:**
 - Load average and uptime: implement as `script` one-liners until demand is shown

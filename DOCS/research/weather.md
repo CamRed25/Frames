@@ -4,11 +4,11 @@
 
 ## Question
 
-What HTTP client crate and weather data source should be used to implement a weather widget in `frames_core`, and how should the widget integrate with the existing `Widget` trait and Poller architecture?
+What HTTP client crate and weather data source should be used to implement a weather widget in `parapet_core`, and how should the widget integrate with the existing `Widget` trait and Poller architecture?
 
 ## Summary
 
-Use `ureq ~3.2` (MIT/Apache-2.0, blocking HTTP, pure Rust, 103M downloads) to call the Open-Meteo free API (no API key, CC-BY 4.0, non-commercial OK). A `WeatherWidget` implemented in `frames_core::widgets::weather` stores a cached `WeatherData` value and returns it on Poller-driven `update()` calls; the cache is refreshed only when the HTTP fetch succeeds, providing graceful degradation on network errors. A 30-minute poll interval (1 800 000 ms) safely fits within Open-Meteo's 10 K calls/day free tier.
+Use `ureq ~3.2` (MIT/Apache-2.0, blocking HTTP, pure Rust, 103M downloads) to call the Open-Meteo free API (no API key, CC-BY 4.0, non-commercial OK). A `WeatherWidget` implemented in `parapet_core::widgets::weather` stores a cached `WeatherData` value and returns it on Poller-driven `update()` calls; the cache is refreshed only when the HTTP fetch succeeds, providing graceful degradation on network errors. A 30-minute poll interval (1 800 000 ms) safely fits within Open-Meteo's 10 K calls/day free tier.
 
 ---
 
@@ -29,7 +29,7 @@ Use `ureq ~3.2` (MIT/Apache-2.0, blocking HTTP, pure Rust, 103M downloads) to ca
 - **RUSTSEC:** No advisories for `ureq` or `serde_json` found
 
 ```toml
-# frames_core/Cargo.toml
+# parapet_core/Cargo.toml
 [dependencies]
 ureq = { version = "~3.2", features = ["json"] }
 ```
@@ -69,7 +69,7 @@ Requires an API key stored in config — a worse UX and a potential secrets-in-c
 
 Use **`ureq ~3.2` + Open-Meteo**.
 
-**Implementation sketch for `frames_core::widgets::weather`:**
+**Implementation sketch for `parapet_core::widgets::weather`:**
 
 ```rust
 use serde::Deserialize;
@@ -97,7 +97,7 @@ pub struct WeatherWidget {
 }
 
 impl Widget for WeatherWidget {
-    fn update(&mut self) -> Result<WidgetData, FramesError> {
+    fn update(&mut self) -> Result<WidgetData, ParapetError> {
         let url = format!(
             "https://api.open-meteo.com/v1/forecast\
              ?latitude={}&longitude={}&current=temperature_2m,weather_code,wind_speed_10m",
@@ -120,7 +120,7 @@ impl Widget for WeatherWidget {
                 tracing::warn!("weather fetch failed: {e}");
                 self.last.clone()
                     .map(WidgetData::Weather)
-                    .ok_or_else(|| FramesError::io("weather: no data yet"))
+                    .ok_or_else(|| ParapetError::io("weather: no data yet"))
             }
         }
     }
@@ -143,7 +143,7 @@ Weather {
 },
 ```
 
-Add `TempUnit` as a plain `#[derive(Debug, Clone, Copy)] pub enum TempUnit { Celsius, Fahrenheit }` in `frames_core::widgets::weather`.
+Add `TempUnit` as a plain `#[derive(Debug, Clone, Copy)] pub enum TempUnit { Celsius, Fahrenheit }` in `parapet_core::widgets::weather`.
 
 **`WidgetConfig` fields to add:**
 
@@ -159,11 +159,11 @@ units = "celsius"       # optional, default "celsius"
 
 **Widget name for CSS:** `.widget-weather`
 
-**GTK renderer display** (suggestion for `frames_bar`):
+**GTK renderer display** (suggestion for `parapet_bar`):
 - Map `weather_code` to a UTF-8 symbol: ☀ (0), ⛅ (1–3), 🌫 (45–48), 🌧 (51–67), 🌨 (71–77), ⛈ (95+)
 - Display: `☀ 12°C`
 
-**Standards reference:** ARCHITECTURE §3 (display isolation — `ureq` is pure Rust, no display dep, safe in `frames_core`); BUILD_GUIDE §1.2 (no new system libraries required); WIDGET_API §5 (5-step checklist for new widgets).
+**Standards reference:** ARCHITECTURE §3 (display isolation — `ureq` is pure Rust, no display dep, safe in `parapet_core`); BUILD_GUIDE §1.2 (no new system libraries required); WIDGET_API §5 (5-step checklist for new widgets).
 
 ---
 
@@ -188,5 +188,5 @@ The `BUILD_GUIDE §1.2` system dependency table does not need updating — `ureq
 ## Open Questions
 
 1. **`ureq` TLS / `ring` version** — `ureq v3.2` ships with rustls; confirm the transitive `ring` dependency is ≥ 0.17 (RUSTSEC-2025-0010 notes < 0.17 is unmaintained). Run `cargo tree -p ureq` before pinning to verify.
-2. **Open-Meteo CC-BY attribution** — The licence requires attribution for public distribution. For a personal bar this is a non-issue; if Frames is packaged and redistributed, a notice in `README.md` or `--version` output should name Open-Meteo as the data source.
+2. **Open-Meteo CC-BY attribution** — The licence requires attribution for public distribution. For a personal bar this is a non-issue; if Parapet is packaged and redistributed, a notice in `README.md` or `--version` output should name Open-Meteo as the data source.
 3. **Network unavailability at startup** — The stale-cache fallback handles mid-session failures; widgets show the last known value. On cold start with no network, the widget returns `Err` until the first successful fetch. The bar renderer should display a neutral placeholder (e.g. `? --°`) rather than hiding the widget.

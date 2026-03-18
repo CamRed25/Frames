@@ -1,4 +1,4 @@
-# Frames — Widget API
+# Parapet — Widget API
 
 > **Scope:** Widget trait contract, `WidgetData` enum specification, widget lifecycle, and rules for adding new widget types.
 > **Last Updated:** Mar 17, 2026
@@ -7,19 +7,19 @@
 
 ## 1. Overview
 
-The `Widget` trait is the uniform interface between `frames_core` (data collection) and `frames_bar` (GTK3 rendering). Every data-providing component in Frames implements `Widget`.
+The `Widget` trait is the uniform interface between `parapet_core` (data collection) and `parapet_bar` (GTK3 rendering). Every data-providing component in Parapet implements `Widget`.
 
 The contract is strict:
-- `frames_core` owns data collection and exposes `WidgetData`
-- `frames_bar` owns rendering and consumes `WidgetData`
-- No GTK types cross into `frames_core`; no system-info types cross into `frames_bar`
+- `parapet_core` owns data collection and exposes `WidgetData`
+- `parapet_bar` owns rendering and consumes `WidgetData`
+- No GTK types cross into `parapet_core`; no system-info types cross into `parapet_bar`
 
 ---
 
 ## 2. Widget API Version
 
 ```rust
-// frames_core/src/widget.rs
+// parapet_core/src/widget.rs
 pub const WIDGET_API_VERSION: &str = "1.7.1";
 ```
 
@@ -68,8 +68,8 @@ pub trait Widget: Send + Sync {
     ///
     /// # Errors
     ///
-    /// Returns [`FramesError`] if the data source is unavailable or unreadable.
-    fn update(&mut self) -> Result<WidgetData, FramesError>;
+    /// Returns [`ParapetError`] if the data source is unavailable or unreadable.
+    fn update(&mut self) -> Result<WidgetData, ParapetError>;
 }
 ```
 
@@ -232,12 +232,12 @@ pub enum BatteryStatus {
 
 ## 5. Adding a New Widget Type
 
-When adding a new built-in widget to `frames_core`:
+When adding a new built-in widget to `parapet_core`:
 
 1. **Add the `WidgetData` variant** in `widget.rs` with all fields documented
 2. **Implement the `Widget` trait** in `widgets/<name>.rs`
-3. **Add the widget type** to `FramesConfig` deserialization in `config.rs`
-4. **Add a renderer** in `frames_bar/src/widgets/<name>.rs` that consumes the new variant
+3. **Add the widget type** to `ParapetConfig` deserialization in `config.rs`
+4. **Add a renderer** in `parapet_bar/src/widgets/<name>.rs` that consumes the new variant
 5. **Update CONFIG_MODEL.md** with the new `type` string and its config fields
 6. **Update WIDGET_API.md** (this file) — add the variant to §4, bump the version in §2
 7. **Update ARCHITECTURE.md §4.1** — add the new module to the module table
@@ -256,7 +256,7 @@ Config loaded
 Widget instance created via factory (match config.widget_type { ... })
     │
     ▼
-Renderer created from widget config (frames_bar)
+Renderer created from widget config (parapet_bar)
     │
     ▼
 Renderer widget() added to bar layout
@@ -297,7 +297,7 @@ On the first call to `update()`, some widgets (CPU, network) have no previous sa
 
 ```rust
 // cpu.rs
-pub fn update(&mut self) -> Result<WidgetData, FramesError> {
+pub fn update(&mut self) -> Result<WidgetData, ParapetError> {
     self.system.refresh_cpu();
     let usage = if self.first_call {
         self.first_call = false;
@@ -332,7 +332,7 @@ pub struct ExampleWidget {
 4. On `TryRecvError::Disconnected` — log `tracing::warn!`; break; return cached value. The thread has exited (external process absent, OS restart, etc.). Do not return `Err` — this is a degraded but recoverable state.
 5. Drop the lock before cloning or returning the cached value.
 
-**Thread naming:** Use `std::thread::Builder::new().name("frames-<purpose>")` so threads appear with meaningful names in debuggers and OS process listings.
+**Thread naming:** Use `std::thread::Builder::new().name("parapet-<purpose>")` so threads appear with meaningful names in debuggers and OS process listings.
 
 **Thread lifecycle:** The background thread exits when `tx.send()` fails because the widget was dropped (receiver gone) or when its external subprocess exits. Storing `_thread: JoinHandle` (not calling `join()` in `Drop`) is correct for bar-lifetime widgets — the OS reclaims the thread when the process exits. Implement `Drop` with `join()` only if the widget can outlive the bar or if the thread holds OS resources that must be released before process exit.
 
@@ -359,7 +359,7 @@ pub struct ExampleWidget {
 
 ### 1.7.0 (2026-03-18)
 - Added `all_disks: Vec<DiskEntry>` to `WidgetData::Disk` — full list of real mounted filesystems for hover tooltip
-- Added `DiskEntry { mount: String, used_bytes: u64, total_bytes: u64 }` public struct (re-exported from `frames_core`)
+- Added `DiskEntry { mount: String, used_bytes: u64, total_bytes: u64 }` public struct (re-exported from `parapet_core`)
 - Bar renderer wraps disk label in `gtk::EventBox` and sets multi-line tooltip from `all_disks`
 - Non-breaking field addition (`#[non_exhaustive]`)
 

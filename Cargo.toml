@@ -1,16 +1,16 @@
 [workspace]
 members = [
-    "crates/frames_core",
-    "crates/frames_bar",
+    "crates/parapet_core",
+    "crates/parapet_bar",
 ]
 resolver = "2"
 
 [workspace.package]
 edition = "2021"
 rust-version = "1.75"
-authors = ["Frames Contributors"]
+authors = ["Parapet Contributors"]
 license = "GPL-3.0-or-later"
-repository = "https://github.com/cam/frames"
+repository = "https://github.com/CamRed25/Frames"
 
 [workspace.lints.clippy]
 pedantic = "warn"

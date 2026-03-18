@@ -1,4 +1,4 @@
-# Frames — Build Guide
+# Parapet — Build Guide
 
 > **Scope:** Build prerequisites, Cargo workspace setup, dependency compilation, and CI build steps.
 > **Last Updated:** Mar 17, 2026
@@ -39,7 +39,7 @@ These libraries must be present on the build host. They are detected via `pkg-co
 > over a Unix socket — `libdbus` is not required.
 >
 > **Note:** `schemars` (JSON Schema derive) and `serde_json` added in v0.1.x are pure Rust
-> with no system library prerequisites. They are used only by `frames_core` for schema
+> with no system library prerequisites. They are used only by `parapet_core` for schema
 > generation and are not linked into the GTK3 display path.
 
 ```bash
@@ -73,17 +73,17 @@ After cloning, run `just install-hooks` once to install the pre-commit hook (§3
 # Cargo.toml (workspace root)
 [workspace]
 members = [
-    "crates/frames_core",
-    "crates/frames_bar",
+    "crates/parapet_core",
+    "crates/parapet_bar",
 ]
 resolver = "2"
 
 [workspace.package]
 edition = "2021"
 rust-version = "1.75"
-authors = ["Frames Contributors"]
+authors = ["Parapet Contributors"]
 license = "GPL-3.0-or-later"
-repository = "https://github.com/cam/frames"
+repository = "https://github.com/cam/parapet"
 
 [workspace.lints.clippy]
 pedantic = "warn"
@@ -112,9 +112,9 @@ glib = "~0.18"
 ### 2.2 Crate Cargo.toml Templates
 
 ```toml
-# crates/frames_core/Cargo.toml
+# crates/parapet_core/Cargo.toml
 [package]
-name = "frames_core"
+name = "parapet_core"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -139,9 +139,9 @@ tempfile = "3"
 ```
 
 ```toml
-# crates/frames_bar/Cargo.toml
+# crates/parapet_bar/Cargo.toml
 [package]
-name = "frames_bar"
+name = "parapet_bar"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -152,7 +152,7 @@ license.workspace = true
 workspace = true
 
 [dependencies]
-frames_core = { path = "../frames_core" }
+parapet_core = { path = "../parapet_core" }
 gtk.workspace = true
 gdk.workspace = true
 glib.workspace = true
@@ -233,7 +233,7 @@ The hook (`scripts/pre-commit`) runs `cargo fmt --check` and `cargo clippy -- -D
 ## 4. Feature Flags
 
 ```toml
-# crates/frames_core/Cargo.toml
+# crates/parapet_core/Cargo.toml
 [features]
 ## Default-on: none currently.
 default = []
@@ -258,7 +258,7 @@ Both must succeed. Optional features are strictly additive — disabling them mu
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `FRAMES_LOG` | Log level filter for `tracing-subscriber` | `info` |
-| `FRAMES_CONFIG` | Override config file path | `~/.config/frames/config.toml` |
+| `PARAPET_CONFIG` | Override config file path | `~/.config/parapet/config.toml` |
 | `RUST_BACKTRACE` | Enable backtraces on panic | `0` |
 
 Set `FRAMES_LOG=debug` during development for verbose output.
@@ -269,14 +269,14 @@ Set `FRAMES_LOG=debug` during development for verbose output.
 
 ```bash
 # Development run (from workspace root)
-cargo run -p frames_bar
+cargo run -p parapet_bar
 
 # With a custom config
-FRAMES_CONFIG=/path/to/config.toml cargo run -p frames_bar
+PARAPET_CONFIG=/path/to/config.toml cargo run -p parapet_bar
 
 # Release build + run
 cargo build --workspace --release
-./target/release/frames_bar
+./target/release/parapet_bar
 ```
 
 The bar requires a running X11 display. `DISPLAY` must be set. Running without a display will fail at `gtk::init()`.

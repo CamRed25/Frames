@@ -1,4 +1,4 @@
-# Frames — Platform Compatibility
+# Parapet — Platform Compatibility
 
 > **Scope:** Supported Linux distributions, desktop environment requirements, X11 display system support, and runtime detection.
 > **Last Updated:** Mar 17, 2026
@@ -7,7 +7,7 @@
 
 ## 1. Overview
 
-Frames targets Linux exclusively with the X11 display system. Cinnamon is the primary desktop environment target. Any EWMH-compliant window manager on X11 should work, but Cinnamon is the only one tested.
+Parapet targets Linux exclusively with the X11 display system. Cinnamon is the primary desktop environment target. Any EWMH-compliant window manager on X11 should work, but Cinnamon is the only one tested.
 
 ---
 
@@ -34,7 +34,7 @@ Frames targets Linux exclusively with the X11 display system. Cinnamon is the pr
 
 ### 3.1 X11 Required
 
-Frames requires X11. The bar uses:
+Parapet requires X11. The bar uses:
 - `gdk::WindowTypeHint::Dock` — requires X11 window type support
 - `_NET_WM_STRUT_PARTIAL` — EWMH X11 property
 - `_NET_WM_WINDOW_TYPE_DOCK` — EWMH X11 property
@@ -48,7 +48,7 @@ The window manager must be EWMH-compliant to respect the strut and dock type. Mo
 
 ### 3.3 DISPLAY Environment Variable
 
-`DISPLAY` must be set when launching Frames. GTK3 will fail to initialize without it. On a standard X11 desktop session this is always set.
+`DISPLAY` must be set when launching Parapet. GTK3 will fail to initialize without it. On a standard X11 desktop session this is always set.
 
 ```bash
 # Verify before running
@@ -75,7 +75,7 @@ Cinnamon itself requires GTK 3.22+. Any Cinnamon installation has a compatible G
 
 ### 5.1 Panel Reserve Area
 
-Cinnamon respects `_NET_WM_STRUT_PARTIAL`. When Frames sets this property, Cinnamon:
+Cinnamon respects `_NET_WM_STRUT_PARTIAL`. When Parapet sets this property, Cinnamon:
 - Prevents maximized windows from overlapping the bar
 - Adjusts the work area for window placement
 
@@ -83,13 +83,13 @@ If the strut is not set correctly, maximized windows will cover the bar. See BAR
 
 ### 5.2 Running Alongside Cinnamon's Panel
 
-Frames can run alongside Cinnamon's built-in panel. Set different screen positions (e.g., Frames on top, Cinnamon panel on bottom) to avoid overlap. Both struts will be respected.
+Parapet can run alongside Cinnamon's built-in panel. Set different screen positions (e.g., Parapet on top, Cinnamon panel on bottom) to avoid overlap. Both struts will be respected.
 
 To hide Cinnamon's panel: right-click the panel → Properties → Auto-hide, or remove it entirely.
 
 ### 5.3 Cinnamon Themes
 
-Cinnamon applies its own GTK theme to all GTK3 applications including Frames. The `frames.css` user stylesheet overrides Cinnamon theme properties for bar-specific elements. Use specific CSS selectors to avoid unintentionally overriding Cinnamon's own widgets.
+Cinnamon applies its own GTK theme to all GTK3 applications including Parapet. The `parapet.css` user stylesheet overrides Cinnamon theme properties for bar-specific elements. Use specific CSS selectors to avoid unintentionally overriding Cinnamon's own widgets.
 
 ---
 

@@ -77,7 +77,7 @@ typedef GdkFilterReturn (*GdkFilterFunc)(
 );
 ```
 
-The Rust implementation in `crates/frames_bar`:
+The Rust implementation in `crates/parapet_bar`:
 
 ```rust
 use gdk::prelude::*;
@@ -150,14 +150,14 @@ The `data_ptr` callback currently uses EWMH atom values as `u64` identifiers.
 To decode `XEvent` layout safely, the `x11` crate is needed:
 
 ```toml
-# frames_bar/Cargo.toml
+# parapet_bar/Cargo.toml
 x11 = { workspace = true, features = ["xlib"] }
 ```
 
 `x11` is already a transitive dependency (via `gdk`/`gtk` C libraries) but may
 not be declared as a direct workspace dep. Must confirm in `Cargo.lock`.
 
-**Precedent:** `crates/frames_bar/src/launcher.rs` already uses `unsafe` blocks
+**Precedent:** `crates/parapet_bar/src/launcher.rs` already uses `unsafe` blocks
 for X11 window operations. This pattern is consistent with the codebase.
 
 **Safety requirements per `CODING_STANDARDS.md §8.2`:**
@@ -173,7 +173,7 @@ for X11 window operations. This pattern is consistent with the codebase.
 
 **Cons:**
 - `unsafe` FFI surface (~30 lines). Must be reviewed carefully.
-- Requires `x11` crate as a direct dep in `frames_bar/Cargo.toml`.
+- Requires `x11` crate as a direct dep in `parapet_bar/Cargo.toml`.
 - Must implement `remove_filter` teardown or the dangling `data_ptr` will be
   called after the widget is dropped.
 - X event filter fires for **every** X event until the filter checks the type —
@@ -254,7 +254,7 @@ Rejected.
 
 2. **Plan Option A as a follow-on feature:** Implement `gdk_window_add_filter`
    unsafe FFI integration. Requirements:
-   - Add `x11` to direct deps in `frames_bar/Cargo.toml`
+   - Add `x11` to direct deps in `parapet_bar/Cargo.toml`
    - Implement `WorkspacesEventFilter` struct with `add_filter`/`remove_filter`
      lifecycle methods
    - Add `SAFETY:` comments for all three `unsafe` blocks (`add_filter`,
@@ -262,8 +262,8 @@ Rejected.
    - Move `glib::timeout_add_local` self-poll out and replace with the filter
    - Add integration test (if X11 display available in test environment)
 
-   Document clearly that this is a `frames_bar`-only feature (display code). It
-   does not touch `frames_core`.
+   Document clearly that this is a `parapet_bar`-only feature (display code). It
+   does not touch `parapet_core`.
 
 3. **Do not implement Option B** (fd-add racing with GDK's own fd reader).
 
@@ -277,7 +277,7 @@ should be added:
 
 > **Event-driven widgets:** A bar-side widget renderer may register a
 > `gdk_window_add_filter` callback instead of (or in addition to) a polling
-> timer, provided: (a) it is implemented only in `frames_bar`, (b) all
+> timer, provided: (a) it is implemented only in `parapet_bar`, (b) all
 > `unsafe` blocks carry `SAFETY:` justifications, (c) filter teardown
 > (`gdk_window_remove_filter`) is called before widget drop.
 
@@ -290,17 +290,17 @@ should be added:
 - `https://docs.rs/gdk/0.18.0/gdk/prelude/trait.WindowExtManual.html`: confirmed
   `add_filter` is **not** present in gdk-rs 0.18 safe Rust API
 - GDK 3 C API reference: `gdk_window_add_filter`, `GdkFilterFunc`, `GdkFilterReturn`
-- `crates/frames_bar/src/widgets/workspaces.rs`: current self-polling implementation
-- `crates/frames_bar/src/main.rs` (~line 628): workspaces timer setup
-- `crates/frames_bar/src/launcher.rs`: existing `unsafe` FFI precedent in `frames_bar`
+- `crates/parapet_bar/src/widgets/workspaces.rs`: current self-polling implementation
+- `crates/parapet_bar/src/main.rs` (~line 628): workspaces timer setup
+- `crates/parapet_bar/src/launcher.rs`: existing `unsafe` FFI precedent in `parapet_bar`
 - `standards/CODING_STANDARDS.md §8.2`: `unsafe` block documentation requirements
 
 ## Open Questions
 
 1. **`x11` crate version:** Is `x11` crate already in `Cargo.lock` as a
-   transitive dep from `gdk-sys`? If so, adding it to `frames_bar/Cargo.toml`
+   transitive dep from `gdk-sys`? If so, adding it to `parapet_bar/Cargo.toml`
    as a direct dep only documents what is already linked. Confirm with
-   `cargo tree -p frames_bar | grep x11` before adding.
+   `cargo tree -p parapet_bar | grep x11` before adding.
 
 2. **`remove_filter` on teardown:** GTK3 bar teardown sequence needs to call
    `gdk_window_remove_filter` before destroy. The `Bar` struct's `Drop` impl

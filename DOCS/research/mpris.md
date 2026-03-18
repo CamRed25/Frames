@@ -4,7 +4,7 @@
 
 ## Question
 
-What D-Bus client crate should be used to implement an MPRIS2 media widget in `frames_core`, and how should the blocking/async mismatch between D-Bus I/O and the synchronous `Widget::update()` contract be resolved?
+What D-Bus client crate should be used to implement an MPRIS2 media widget in `parapet_core`, and how should the blocking/async mismatch between D-Bus I/O and the synchronous `Widget::update()` contract be resolved?
 
 ## Summary
 
@@ -67,10 +67,10 @@ Use `zbus ~5.14` with the default `blocking-api` feature flag. The `zbus::blocki
   ```
   The blocking version `MediaPlayer2PlayerProxyBlocking` is generated automatically alongside the async variant.
 - **RUSTSEC:** No advisories for `zbus` found
-- **Display isolation:** D-Bus is a session IPC mechanism — no display server dependency. `zbus` is safe to use in `frames_core` (no GTK, GDK, or X11 imports required).
+- **Display isolation:** D-Bus is a session IPC mechanism — no display server dependency. `zbus` is safe to use in `parapet_core` (no GTK, GDK, or X11 imports required).
 
 ```toml
-# frames_core/Cargo.toml
+# parapet_core/Cargo.toml
 [dependencies]
 zbus = { version = "~5.14", features = ["blocking-api"] }
 ```
@@ -103,7 +103,7 @@ If no player is active, `update()` should return `WidgetData::Media` with `statu
 
 Use **`zbus ~5.14` with `blocking-api`**.
 
-**Implementation model for `frames_core::widgets::media`:**
+**Implementation model for `parapet_core::widgets::media`:**
 
 ```rust
 pub struct MediaWidget {
@@ -112,7 +112,7 @@ pub struct MediaWidget {
 }
 
 impl Widget for MediaWidget {
-    fn update(&mut self) -> Result<WidgetData, FramesError> {
+    fn update(&mut self) -> Result<WidgetData, ParapetError> {
         let conn = match self.conn.get_or_insert_with(|| {
             zbus::blocking::Connection::session().ok()
         }) {
@@ -146,7 +146,7 @@ Media {
 },
 ```
 
-Add `PlaybackStatus` as a `#[derive(Debug, Clone, Copy, PartialEq, Eq)] pub enum PlaybackStatus { Playing, Paused, Stopped }` in `frames_core::widgets::media`.
+Add `PlaybackStatus` as a `#[derive(Debug, Clone, Copy, PartialEq, Eq)] pub enum PlaybackStatus { Playing, Paused, Stopped }` in `parapet_core::widgets::media`.
 
 **`WidgetConfig` fields to add:**
 
@@ -160,19 +160,19 @@ max_title_len = 30       # optional: truncate long titles
 
 **Widget name for CSS:** `.widget-media`
 
-**GTK renderer display** (suggestion for `frames_bar`):
+**GTK renderer display** (suggestion for `parapet_bar`):
 - Playing: `⏸ Artist — Title` (truncated to `max_title_len`)
 - Paused: `▶ Artist — Title`
 - Stopped / no player: widget hidden or shows `—`
-- Click actions (`on_click`) can map to `play_pause`, `next`, `previous` via existing shell command mechanism; alternatively, a dedicated click handler in `frames_bar::widgets::media` could call the D-Bus method directly without spawning a shell
+- Click actions (`on_click`) can map to `play_pause`, `next`, `previous` via existing shell command mechanism; alternatively, a dedicated click handler in `parapet_bar::widgets::media` could call the D-Bus method directly without spawning a shell
 
-**Architecture exception to note:** The `frames_bar` media widget renderer will need a second reference to a `zbus::blocking::Connection` if it wants to issue `PlayPause`/`Next`/`Previous` commands on click. The connection stored in `frames_core::MediaWidget` is not accessible from `frames_bar`. Two options:
-- **A (simpler):** Click actions use `playerctl play-pause` / `playerctl next` shell commands via the existing `on_click` / `on_scroll_up` mechanism — no `frames_bar` D-Bus access needed
-- **B (integrated):** `frames_bar::widgets::media` opens its own `zbus::blocking::Connection` for sending commands; data still comes from `frames_core` via `WidgetData::Media`
+**Architecture exception to note:** The `parapet_bar` media widget renderer will need a second reference to a `zbus::blocking::Connection` if it wants to issue `PlayPause`/`Next`/`Previous` commands on click. The connection stored in `parapet_core::MediaWidget` is not accessible from `parapet_bar`. Two options:
+- **A (simpler):** Click actions use `playerctl play-pause` / `playerctl next` shell commands via the existing `on_click` / `on_scroll_up` mechanism — no `parapet_bar` D-Bus access needed
+- **B (integrated):** `parapet_bar::widgets::media` opens its own `zbus::blocking::Connection` for sending commands; data still comes from `parapet_core` via `WidgetData::Media`
 
-Option A (shell commands) is recommended for v0.1 — it requires zero new code in `frames_bar` and leverages the already-built click-action system.
+Option A (shell commands) is recommended for v0.1 — it requires zero new code in `parapet_bar` and leverages the already-built click-action system.
 
-**Standards reference:** ARCHITECTURE §3 (no display deps in `frames_core` — D-Bus passes this check); BUILD_GUIDE §1.2 (no new system libraries with `zbus`); WIDGET_API §5 (5-step checklist applies).
+**Standards reference:** ARCHITECTURE §3 (no display deps in `parapet_core` — D-Bus passes this check); BUILD_GUIDE §1.2 (no new system libraries with `zbus`); WIDGET_API §5 (5-step checklist applies).
 
 ---
 
@@ -193,6 +193,6 @@ Option A (shell commands) is recommended for v0.1 — it requires zero new code 
 
 ## Open Questions
 
-1. **Player selection strategy** — `find_active()` equivalent picks the first MPRIS bus name alphabetically. Should Frames prefer the most recently foregrounded player? This would require listening to `NameOwnerChanged` signals on the session bus — more complexity. For v0.1, first-found ordering is acceptable.
-2. **`playerctl` availability** — Option A (shell commands) for click actions depends on `playerctl` being installed. Should `frames_bar` fall back silently if it is absent, or show a console warning? The existing `spawn_shell()` helper already ignores the child's exit code, so absence of `playerctl` is already handled gracefully.
+1. **Player selection strategy** — `find_active()` equivalent picks the first MPRIS bus name alphabetically. Should Parapet prefer the most recently foregrounded player? This would require listening to `NameOwnerChanged` signals on the session bus — more complexity. For v0.1, first-found ordering is acceptable.
+2. **`playerctl` availability** — Option A (shell commands) for click actions depends on `playerctl` being installed. Should `parapet_bar` fall back silently if it is absent, or show a console warning? The existing `spawn_shell()` helper already ignores the child's exit code, so absence of `playerctl` is already handled gracefully.
 3. **Cover art** — MPRIS `Metadata` includes `mpris:artUrl` (a `file://` or `http://` URI). Rendering cover art in a status bar is non-trivial and scope-appropriate for a future enhancement, not v0.1.

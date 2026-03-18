@@ -4,13 +4,13 @@
 
 ## Question
 
-What theming capabilities can Frames realistically implement using GTK3's CSS system, and what is the right architecture for named theme selection, user overrides, and live theme switching?
+What theming capabilities can Parapet realistically implement using GTK3's CSS system, and what is the right architecture for named theme selection, user overrides, and live theme switching?
 
 ---
 
 ## Summary
 
-GTK3's `CssProvider` system supports a clean two-layer pipeline: a **theme provider** (named built-in or user-installed) at `STYLE_PROVIDER_PRIORITY_APPLICATION` (600), and a **user override provider** at `STYLE_PROVIDER_PRIORITY_USER` (800). The recommended implementation adds a `theme` field to `BarConfig`, ships 3–4 bundled named themes compiled in via `include_bytes!`, optionally discovers user themes from `~/.config/frames/themes/`, and enables live theme hot-swap without a widget rebuild. GTK3's `@define-color` directive is the right mechanism for theme color tokens. The full-file approach (each theme is self-contained CSS) is more practical than a token-split architecture.
+GTK3's `CssProvider` system supports a clean two-layer pipeline: a **theme provider** (named built-in or user-installed) at `STYLE_PROVIDER_PRIORITY_APPLICATION` (600), and a **user override provider** at `STYLE_PROVIDER_PRIORITY_USER` (800). The recommended implementation adds a `theme` field to `BarConfig`, ships 3–4 bundled named themes compiled in via `include_bytes!`, optionally discovers user themes from `~/.config/parapet/themes/`, and enables live theme hot-swap without a widget rebuild. GTK3's `@define-color` directive is the right mechanism for theme color tokens. The full-file approach (each theme is self-contained CSS) is more practical than a token-split architecture.
 
 ---
 
@@ -48,7 +48,7 @@ GTK3 has its own CSS dialect. Key capabilities and limits:
 @define-color critical_color #e53935;
 @define-color workspace_active #ffffff;
 
-.frames-bar {
+.parapet-bar {
     background-color: @bar_bg;
     color: @bar_fg;
     font-family: monospace;
@@ -60,7 +60,7 @@ GTK3 has its own CSS dialect. Key capabilities and limits:
 .workspace.active { color: @workspace_active; }
 ```
 
-This is the right pattern for Frames theme files — tokens at the top define the color palette, rules below reference them. Users can understand and override individual colors easily.
+This is the right pattern for Parapet theme files — tokens at the top define the color palette, rules below reference them. Users can understand and override individual colors easily.
 
 ### GTK3 Priority Constants (gtk-rs ~0.18)
 
@@ -72,7 +72,7 @@ gtk::STYLE_PROVIDER_PRIORITY_APPLICATION // 600
 gtk::STYLE_PROVIDER_PRIORITY_USER        // 800
 ```
 
-Higher priority wins when rules conflict. The natural layering for Frames:
+Higher priority wins when rules conflict. The natural layering for Parapet:
 
 | Layer | Provider | Priority |
 |-------|----------|----------|
@@ -127,12 +127,12 @@ A theme provider (named built-in or user theme file) at priority 600, plus an op
 
 ```toml
 [bar]
-theme = "catppuccin-mocha"   # selects named theme (built-in or ~/.config/frames/themes/)
-css = "~/.config/frames/overrides.css"   # optional: only rules you want to change
+theme = "catppuccin-mocha"   # selects named theme (built-in or ~/.config/parapet/themes/)
+css = "~/.config/parapet/overrides.css"   # optional: only rules you want to change
 ```
 
 Resolution order:
-1. Look for `~/.config/frames/themes/<theme>.css` — user-installed theme (highest authorship)
+1. Look for `~/.config/parapet/themes/<theme>.css` — user-installed theme (highest authorship)
 2. Look in built-in compiled-in table — shipped themes
 3. Fall back to `"default"`
 
@@ -168,10 +168,10 @@ Structural base CSS (layout, padding, fonts) ships as a separate provider. Theme
 
 ### Config Change
 
-Add `theme: Option<String>` to `BarConfig` in `frames_core/src/config.rs`:
+Add `theme: Option<String>` to `BarConfig` in `parapet_core/src/config.rs`:
 
 ```rust
-/// Named theme to apply. Resolves first from `~/.config/frames/themes/<name>.css`,
+/// Named theme to apply. Resolves first from `~/.config/parapet/themes/<name>.css`,
 /// then from built-in compiled themes. `None` (or `"default"`) uses the
 /// built-in default theme.
 #[serde(default)]
@@ -184,7 +184,7 @@ Rename the existing `css` field's semantics to "user override" (no breaking chan
 
 ```rust
 pub fn load_theme_provider(name: Option<&str>) -> gtk::CssProvider {
-    // 1. Try ~/.config/frames/themes/<name>.css
+    // 1. Try ~/.config/parapet/themes/<name>.css
     // 2. Try built-in table
     // 3. Fall back to default
 }
@@ -226,7 +226,7 @@ The existing hot-reload watcher in `main.rs` gets a small addition:
 
 `main.rs` can accept `--theme <name>` as a CLI override for `bar.theme`. No new crate needed — just check `std::env::args()` before loading config and merge into `BarConfig`. Enables quick testing:
 ```bash
-frames_bar --theme gruvbox
+parapet_bar --theme gruvbox
 ```
 
 ---

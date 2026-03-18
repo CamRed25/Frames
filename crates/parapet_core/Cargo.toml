@@ -1,0 +1,27 @@
+[package]
+name = "parapet_core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+sysinfo.workspace = true
+chrono.workspace = true
+notify.workspace = true
+ureq.workspace = true
+zbus.workspace = true
+schemars.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

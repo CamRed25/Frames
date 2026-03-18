@@ -1,6 +1,6 @@
 # /audit — Standards Compliance Auditor
 
-You are performing a full standards compliance audit of the Frames project.
+You are performing a full standards compliance audit of the Parapet project.
 Complete all three phases in order. Do not skip steps. Write the report when done.
 
 ---
@@ -37,17 +37,17 @@ grep -A 10 '^\[workspace\]' /home/cam/Documents/Status/Cargo.toml
 ```
 Compare the actual `members = [...]` list against §2's crate list.
 
-**frames_core module tree (§4):**
+**parapet_core module tree (§4):**
 ```bash
-ls /home/cam/Documents/Status/crates/frames_core/src/
-ls /home/cam/Documents/Status/crates/frames_core/src/widgets/
+ls /home/cam/Documents/Status/crates/parapet_core/src/
+ls /home/cam/Documents/Status/crates/parapet_core/src/widgets/
 ```
 Compare against §4's module table. Note any files present but undocumented, or documented but absent.
 
-**frames_bar module tree (§5):**
+**parapet_bar module tree (§5):**
 ```bash
-ls /home/cam/Documents/Status/crates/frames_bar/src/
-ls /home/cam/Documents/Status/crates/frames_bar/src/widgets/
+ls /home/cam/Documents/Status/crates/parapet_bar/src/
+ls /home/cam/Documents/Status/crates/parapet_bar/src/widgets/
 ```
 Compare against §5's module table.
 
@@ -61,7 +61,7 @@ Compare against §3's documented dependencies. Note any in `Cargo.toml` absent f
 
 Read `/home/cam/Documents/Status/standards/CONFIG_MODEL.md`.
 
-Compare documented `FramesConfig`, `BarConfig`, and `WidgetConfig` struct fields against the actual Rust source in `crates/frames_core/src/config.rs`. Note missing or added fields.
+Compare documented `ParapetConfig`, `BarConfig`, and `WidgetConfig` struct fields against the actual Rust source in `crates/parapet_core/src/config.rs`. Note missing or added fields.
 
 ### 1.3 BUILD_GUIDE.md Freshness
 
@@ -82,7 +82,7 @@ Read `/home/cam/Documents/Status/standards/TESTING_GUIDE.md`.
 
 **Integration test files:**
 ```bash
-ls /home/cam/Documents/Status/crates/frames_core/tests/ 2>/dev/null || echo "no integration tests yet"
+ls /home/cam/Documents/Status/crates/parapet_core/tests/ 2>/dev/null || echo "no integration tests yet"
 ```
 Compare actual test files against §2.2.
 
@@ -119,12 +119,12 @@ grep -A 5 '\[workspace.lints' /home/cam/Documents/Status/Cargo.toml
 Run each check. Record violations with file path and line number.
 When a check returns zero results, record it as PASS in the Appendix.
 
-### 2.1 GTK/Display Imports in frames_core (RULE_OF_LAW §5.3) — Severity: CRITICAL
+### 2.1 GTK/Display Imports in parapet_core (RULE_OF_LAW §5.3) — Severity: CRITICAL
 
 ```bash
-grep -rn "gtk\|gdk\|glib\|x11" /home/cam/Documents/Status/crates/frames_core/src/ --include="*.rs"
+grep -rn "gtk\|gdk\|glib\|x11" /home/cam/Documents/Status/crates/parapet_core/src/ --include="*.rs"
 ```
-Any actual import (not in a doc comment) in `frames_core` is a CRITICAL violation.
+Any actual import (not in a doc comment) in `parapet_core` is a CRITICAL violation.
 
 ### 2.2 .unwrap() in Production Code (CODING_STANDARDS §3.3) — Severity: HIGH
 
@@ -143,7 +143,7 @@ For each `unsafe {`, check whether the preceding 1–3 lines contain `// SAFETY:
 ### 2.4 println! in Library Code (CODING_STANDARDS §9.1) — Severity: MEDIUM
 
 ```bash
-grep -rn "println\!" /home/cam/Documents/Status/crates/frames_core/src/ --include="*.rs"
+grep -rn "println\!" /home/cam/Documents/Status/crates/parapet_core/src/ --include="*.rs"
 ```
 Filter out occurrences inside `#[cfg(test)]` blocks.
 
@@ -157,23 +157,23 @@ grep -rn "TODO\|FIXME" /home/cam/Documents/Status/crates/ --include="*.rs"
 ### 2.6 Missing /// Doc Comments on pub fn (CODING_STANDARDS §7.1) — Severity: MEDIUM
 
 ```bash
-grep -rn "^\s*pub fn" /home/cam/Documents/Status/crates/frames_core/src/ --include="*.rs" -B 1 | head -80
+grep -rn "^\s*pub fn" /home/cam/Documents/Status/crates/parapet_core/src/ --include="*.rs" -B 1 | head -80
 ```
 For each `pub fn`, check whether the preceding line contains `///`.
 
 ### 2.7 Missing //! Module-Level Comments — Severity: MEDIUM
 
 ```bash
-grep -rL "^//!" /home/cam/Documents/Status/crates/frames_core/src/ --include="mod.rs"
-grep -rL "^//!" /home/cam/Documents/Status/crates/frames_bar/src/ --include="mod.rs"
+grep -rL "^//!" /home/cam/Documents/Status/crates/parapet_core/src/ --include="mod.rs"
+grep -rL "^//!" /home/cam/Documents/Status/crates/parapet_bar/src/ --include="mod.rs"
 ```
 
-### 2.8 anyhow in frames_core Public API (CODING_STANDARDS §3.2) — Severity: MEDIUM
+### 2.8 anyhow in parapet_core Public API (CODING_STANDARDS §3.2) — Severity: MEDIUM
 
 ```bash
-grep -rn "anyhow::Error\b\|anyhow::Result" /home/cam/Documents/Status/crates/frames_core/src/ --include="*.rs"
+grep -rn "anyhow::Error\b\|anyhow::Result" /home/cam/Documents/Status/crates/parapet_core/src/ --include="*.rs"
 ```
-`anyhow` as a public return type in `frames_core` is a violation. Internal propagation with `?` is acceptable.
+`anyhow` as a public return type in `parapet_core` is a violation. Internal propagation with `?` is acceptable.
 
 ### 2.9 Removed Code Tracking (RULE_OF_LAW §4.1) — Severity: HIGH
 
@@ -212,7 +212,7 @@ Use this structure:
 | TESTING_GUIDE.md Freshness | PASS / FINDINGS | N |
 | RULE_OF_LAW.md Freshness | PASS / FINDINGS | N |
 | CODING_STANDARDS.md Freshness | PASS / FINDINGS | N |
-| GTK in frames_core | PASS / FINDINGS | N |
+| GTK in parapet_core | PASS / FINDINGS | N |
 | .unwrap() in Production | PASS / FINDINGS | N |
 | unsafe / SAFETY Comments | PASS / FINDINGS | N |
 | println! in Library Code | PASS / FINDINGS | N |
@@ -239,7 +239,7 @@ Use this structure:
 
 ## Codebase Compliance Findings
 
-### GTK/Display Imports in frames_core
+### GTK/Display Imports in parapet_core
 [Per violation: file:line, import found, CRITICAL severity]
 
 ### .unwrap() in Production Code
@@ -265,7 +265,7 @@ Use this structure:
 
 | Severity | Definition |
 |----------|-----------|
-| **critical** | GTK in frames_core, unsafe without SAFETY, data loss risk |
+| **critical** | GTK in parapet_core, unsafe without SAFETY, data loss risk |
 | **high** | .unwrap() in production, standards violation, test removed |
 | **medium** | Missing doc comment, wrong TODO format, naming violation |
 | **low** | Minor style, optional improvement |
@@ -278,4 +278,4 @@ Use this structure:
 - If evidence is absent, record PASS — do not fabricate findings.
 - Do not report the same violation twice.
 - Passing checks must appear in the Appendix with brief evidence.
-- Use relative paths from the project root (e.g. `crates/frames_core/src/config.rs:42`).
+- Use relative paths from the project root (e.g. `crates/parapet_core/src/config.rs:42`).

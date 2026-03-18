@@ -1,8 +1,8 @@
-# Frames
+# Parapet
 
-A Rust-native GTK3 status bar for the Cinnamon desktop on Linux.
+> *"Every great fortress has one — the narrow ledge from which the defenders watch, measure, and act. Not the gate, not the tower. The parapet. Always at the top. Always watching."*
 
-Frames anchors a thin bar to the top or bottom of the screen and fills it with configurable widgets: clock, CPU, memory, network, battery, disk, volume, brightness, workspaces, a fuzzy application launcher, weather, and MPRIS2 media controls. It reserves screen space via `_NET_WM_STRUT_PARTIAL` so maximised windows don't overlap it.
+A Rust-native GTK3 status bar for the Cinnamon desktop on Linux. Parapet anchors a thin bar to the top of the screen and fills it with configurable widgets: clock, CPU, memory, network, battery, disk, volume, brightness, workspaces, a fuzzy application launcher, weather, and MPRIS2 media controls. It reserves screen space via `_NET_WM_STRUT_PARTIAL` so maximised windows don't overlap it.
 
 **Status:** `v0.1.0-alpha` — active development on `master`.
 
@@ -10,6 +10,7 @@ Frames anchors a thin bar to the top or bottom of the screen and fills it with c
 
 ## Features
 
+- Pill-island layout — widgets rendered as floating dark pills against a transparent bar, with the wallpaper visible between them
 - Workspace switcher with click-to-switch (sends `_NET_CURRENT_DESKTOP` via `wmctrl`)
 - Application launcher popup with fuzzy search, keyboard navigation, and live app-list refresh via `gio::AppInfoMonitor`
 - Audio volume via `pactl subscribe` (event-driven, no per-poll subprocess) with scroll-to-adjust
@@ -36,28 +37,28 @@ Frames anchors a thin bar to the top or bottom of the screen and fills it with c
 cargo build --release
 ```
 
-The binary is at `target/release/frames_bar`.
+The binary is at `target/release/parapet`.
 
 ---
 
 ## Install
 
-Copy the binary somewhere on `$PATH` and drop a config file at `~/.config/frames/config.toml`:
+Copy the binary somewhere on `$PATH` and drop a config file at `~/.config/parapet/config.toml`:
 
 ```bash
-install -Dm755 target/release/frames_bar ~/.local/bin/frames_bar
-mkdir -p ~/.config/frames
-cp examples/config.toml ~/.config/frames/config.toml   # if provided
+install -Dm755 target/release/parapet ~/.local/bin/parapet
+mkdir -p ~/.config/parapet
+cp examples/config.toml ~/.config/parapet/config.toml   # if provided
 ```
 
-Then add `frames_bar &` to your Cinnamon startup commands (System Settings → Startup Applications).
+Then add `parapet &` to your Cinnamon startup commands (System Settings → Startup Applications).
 
 ---
 
 ## Configuration
 
-Config file: `~/.config/frames/config.toml`  
-Override with `FRAMES_CONFIG=/path/to/config.toml frames_bar`.
+Config file: `~/.config/parapet/config.toml`  
+Override with `PARAPET_CONFIG=/path/to/config.toml parapet`.
 
 ### Minimal example
 
@@ -95,7 +96,7 @@ position = "right"
 | `position` | `"top"` | `"top"` or `"bottom"` |
 | `height` | `30` | Bar height in pixels |
 | `monitor` | `"primary"` | `"primary"` or a 0-based GDK monitor index |
-| `theme` | — | Named theme from `~/.config/frames/themes/<name>.css` |
+| `theme` | — | Named theme from `~/.config/parapet/themes/<name>.css` |
 | `css` | — | Absolute path to a CSS file (overridden by `theme`) |
 | `widget_spacing` | `4` | Pixel gap between widgets |
 
@@ -135,29 +136,35 @@ on_scroll_down = "pactl set-sink-volume @DEFAULT_SINK@ -5%"
 
 ## Theming
 
-Themes are CSS files located at `~/.config/frames/themes/<name>.css`. Select a theme with `theme = "mytheme"` in `[bar]`. Dark/light variants are picked up automatically if `mytheme-dark.css` / `mytheme-light.css` exist, following the system GTK preference.
+*"The parapet bears the colors of its keep."*
+
+Themes are CSS files located at `~/.config/parapet/themes/<name>.css`. Select a theme with `theme = "mytheme"` in `[bar]`. Dark/light variants are picked up automatically if `mytheme-dark.css` / `mytheme-light.css` exist, following the system GTK preference.
 
 Six named colour tokens are available in the default theme and should be used in custom themes:
 
 ```css
-@define-color color-pill    #1e1e2e;
-@define-color color-fg      #cdd6f4;
-@define-color color-fg-dim  #6c7086;
-@define-color color-accent  #89b4fa;
-@define-color color-warning #f9e2af;
-@define-color color-urgent  #f38ba8;
+@define-color color-pill    rgba(15, 12, 10, 0.55);   /* pill island background */
+@define-color color-fg      #ffffff;                   /* primary text */
+@define-color color-fg-dim  rgba(255, 255, 255, 0.4); /* secondary/label text */
+@define-color color-accent  #E8924A;                   /* amber accent */
+@define-color color-warning #f9e2af;                   /* warning state */
+@define-color color-urgent  #f38ba8;                   /* critical/urgent state */
 ```
+
+The default theme renders widgets as floating pill islands against a fully transparent bar, with the desktop wallpaper visible between them. Individual pills are styled via `.parapet-left`, `.parapet-center`, and `.parapet-right`.
 
 ---
 
 ## Architecture
 
+*"Two keeps, one fortress."*
+
 ```
-frames_core   — pure library: widget traits, system info polling, config
-frames_bar    — GTK3 binary: bar window, widget renderers, X11 EWMH
+parapet_core   — pure library: widget traits, system info polling, config
+parapet_bar    — GTK3 binary: bar window, widget renderers, X11 EWMH
 ```
 
-`frames_core` has **no dependency on GTK, GDK, X11, or any display system**. It can be built and tested without a display server. All display logic lives in `frames_bar`.
+`parapet_core` has **no dependency on GTK, GDK, X11, or any display system**. It can be built and tested without a display server. All display logic lives in `parapet_bar`.
 
 See [`standards/ARCHITECTURE.md`](standards/ARCHITECTURE.md) for full design documentation.
 
@@ -180,6 +187,22 @@ cargo test --workspace
 ```
 
 Standards documents are in [`standards/`](standards/). Read [`standards/RULE_OF_LAW.md`](standards/RULE_OF_LAW.md) first.
+
+---
+
+## Roadmap
+
+See [`FUTURES.md`](FUTURES.md) for the full planned feature list.
+
+Highlights:
+
+- GTK4/libadwaita migration
+- Wayland support via `gtk4-layer-shell`
+- System tray via StatusNotifierItem/SNI protocol
+- Multi-monitor support
+- Plugin/widget system via runtime-loaded `.so` files
+- Per-widget click and scroll action bindings
+- Config hot-reload (in progress)
 
 ---
 

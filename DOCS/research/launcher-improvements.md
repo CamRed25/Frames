@@ -4,7 +4,7 @@
 
 ## Question
 
-What are the highest-value improvements to `LauncherWidget` in `frames_bar`, and how should each be implemented using the existing dependency set?
+What are the highest-value improvements to `LauncherWidget` in `parapet_bar`, and how should each be implemented using the existing dependency set?
 
 ## Summary
 
@@ -12,7 +12,7 @@ Seven distinct improvements to the launcher are available — all but one requir
 
 ## Current State
 
-File: `crates/frames_bar/src/widgets/launcher.rs`
+File: `crates/parapet_bar/src/widgets/launcher.rs`
 
 - App list loaded **once** at `new()` — never refreshed. Tracked debt in `futures.md`.
 - Fuzzy search scored against `app.name()` **only** via `SkimMatcherV2`.
@@ -37,7 +37,7 @@ File: `crates/frames_bar/src/widgets/launcher.rs`
 - Enter key must launch the currently selected row (not just the first in the list)
 
 **Dependencies:** None — pure GTK signal wiring.
-**Crates affected:** `frames_bar` only.
+**Crates affected:** `parapet_bar` only.
 
 ---
 
@@ -74,10 +74,10 @@ monitor.connect_changed(move |_| {
 **Constraints:** `AppInfoMonitor` is `!Send + !Sync` — it must be created and used on the GTK main thread only. All existing launcher code already runs on the main thread, so there is no constraint issue.
 
 **Dependencies:** None new — `gio::AppInfoMonitor` is part of `gio ~0.18`, already in the dep tree via `gtk`.
-**Crates affected:** `frames_bar` only.
+**Crates affected:** `parapet_bar` only.
 **Supersedes:** The `futures.md` `notify`-based approach. Recommend closing out that futures entry when this is implemented.
 
-> **Important:** The `notify` dep in the workspace (`Cargo.toml`) is used by `frames_core` for config hot-reload and is not needed for this. Do not add `notify` to `frames_bar/Cargo.toml`.
+> **Important:** The `notify` dep in the workspace (`Cargo.toml`) is used by `parapet_core` for config hot-reload and is not needed for this. Do not add `notify` to `parapet_bar/Cargo.toml`.
 
 ---
 
@@ -117,7 +117,7 @@ Take the maximum score across all fields; use the field that produced the highes
 **Constraints:** `DesktopAppInfo` is `!Send + !Sync` — must remain on GTK main thread. Already satisfied by the launcher's architecture.
 
 **Dependencies:** None new — `DesktopAppInfo` is in the `gio ~0.18` dep already used.
-**Crates affected:** `frames_bar` only.
+**Crates affected:** `parapet_bar` only.
 
 ---
 
@@ -125,7 +125,7 @@ Take the maximum score across all fields; use the field that produced the highes
 
 **Problem:** Matched characters are not highlighted in search results. Users can't tell why a result matched.
 
-**Mechanism:** `fuzzy-matcher ~0.3` — already a workspace dep, used by `frames_bar`. The `fuzzy_indices()` method returns `(score, Vec<usize>)` where the `Vec<usize>` is the positions of matched characters.
+**Mechanism:** `fuzzy-matcher ~0.3` — already a workspace dep, used by `parapet_bar`. The `fuzzy_indices()` method returns `(score, Vec<usize>)` where the `Vec<usize>` is the positions of matched characters.
 
 ```rust
 // Instead of fuzzy_match(), use:
@@ -153,7 +153,7 @@ fn build_highlighted_label(text: &str, indices: &[usize]) -> gtk::Label {
 Note: `glib::markup_escape_text` must be used to prevent XSS-style injection through app names containing `<`, `>`, `&`.
 
 **Dependencies:** None new — uses `fuzzy_indices()` already available in `fuzzy-matcher`.
-**Crates affected:** `frames_bar` only.
+**Crates affected:** `parapet_bar` only.
 
 ---
 
@@ -174,7 +174,7 @@ fn is_pinned(app: &gio::AppInfo, pinned: &[String]) -> bool {
 Pinned apps are prepended to the list in config order; remaining apps follow alphabetically. When a search query is active, the pinned ordering is kept but only matching apps are shown.
 
 **Dependencies:** None new.
-**Crates affected:** `frames_bar`, `frames_core` (`LauncherConfig`).
+**Crates affected:** `parapet_bar`, `parapet_core` (`LauncherConfig`).
 
 ---
 
@@ -185,7 +185,7 @@ Pinned apps are prepended to the list in config order; remaining apps follow alp
 **Mechanism:** Extend `LauncherConfig`:
 
 ```toml
-# ~/.config/frames/config.toml
+# ~/.config/parapet/config.toml
 [launcher]
 button_label = "󰀻"          # nerd font icon, or any string
 popup_width = 320
@@ -202,7 +202,7 @@ pub popup_min_height: Option<i32>,   // default: 200
 ```
 
 **Dependencies:** None.
-**Crates affected:** `frames_bar`, `frames_core` (`LauncherConfig`).
+**Crates affected:** `parapet_bar`, `parapet_core` (`LauncherConfig`).
 
 ---
 
@@ -234,7 +234,7 @@ Returns groups of app IDs scored by GLib's own internal search algorithm, which 
 **Recommendation:** This is worth a prototyping experiment rather than a firm recommendation at this stage. The manual corpus approach (Option 3) is less surprising and gives full control over scoring. If GLib's search proves to match user expectations better in practice, adopt the hybrid approach.
 
 **Dependencies:** None new.
-**Crates affected:** `frames_bar` only.
+**Crates affected:** `parapet_bar` only.
 
 ---
 
@@ -244,13 +244,13 @@ Implement in the following sequence (value/complexity ratio, highest first):
 
 | Priority | Item | Deps | Scope |
 |----------|------|------|-------|
-| 1 | Keyboard navigation (Option 1) | None | `frames_bar` |
-| 2 | Configurable label/dimensions (Option 6) | None | `frames_bar`, `frames_core` |
-| 3 | Live app-list refresh via `AppInfoMonitor` (Option 2) | None | `frames_bar` |
-| 4 | Match highlight rendering (Option 4) | None | `frames_bar` |
-| 5 | Richer search corpus (Option 3) | None | `frames_bar` |
-| 6 | App pinning/favorites (Option 5) | None | `frames_bar`, `frames_core` |
-| 7 | `DesktopAppInfo::search()` hybrid backend (Option 7) | None | `frames_bar` (prototype first) |
+| 1 | Keyboard navigation (Option 1) | None | `parapet_bar` |
+| 2 | Configurable label/dimensions (Option 6) | None | `parapet_bar`, `parapet_core` |
+| 3 | Live app-list refresh via `AppInfoMonitor` (Option 2) | None | `parapet_bar` |
+| 4 | Match highlight rendering (Option 4) | None | `parapet_bar` |
+| 5 | Richer search corpus (Option 3) | None | `parapet_bar` |
+| 6 | App pinning/favorites (Option 5) | None | `parapet_bar`, `parapet_core` |
+| 7 | `DesktopAppInfo::search()` hybrid backend (Option 7) | None | `parapet_bar` (prototype first) |
 
 None of these require a new workspace dependency. Items 1–3 have the highest user-visible impact per implementation hour. Items 3 and 4 are natural pairs to implement together since both require touching `rebuild_list()` and the row construction code.
 
@@ -260,7 +260,7 @@ None of these require a new workspace dependency. Items 1–3 have the highest u
 
 ## Standards Conflict / Proposed Update
 
-No conflicts with existing standards. `WIDGET_API.md` and `BAR_DESIGN.md` do not need updating for these changes — all remain in `frames_bar`, the `Widget` trait contract is unchanged, and `LauncherConfig` additions are additive/non-breaking.
+No conflicts with existing standards. `WIDGET_API.md` and `BAR_DESIGN.md` do not need updating for these changes — all remain in `parapet_bar`, the `Widget` trait contract is unchanged, and `LauncherConfig` additions are additive/non-breaking.
 
 One suggestion for `DOCS/futures.md`: the existing entry about watching XDG data dirs via `notify` should be updated to reference `gio::AppInfoMonitor` as the correct approach, or closed out when Option 2 is implemented.
 
@@ -272,7 +272,7 @@ One suggestion for `DOCS/futures.md`: the existing entry about watching XDG data
 - `https://crates.io/crates/nucleo` — v0.5.0, MPL-2.0 license, disqualified
 - `DOCS/DECISIONS.md` ADR-005 (use `gio::AppInfo`), ADR-006 (use `fuzzy-matcher`, rejects `nucleo`)
 - `DOCS/futures.md` — active debt item: app list not refreshed after startup
-- `crates/frames_bar/src/widgets/launcher.rs` — full implementation reviewed
+- `crates/parapet_bar/src/widgets/launcher.rs` — full implementation reviewed
 
 ## Open Questions
 

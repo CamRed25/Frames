@@ -1,4 +1,4 @@
-# Frames — Release Guide
+# Parapet — Release Guide
 
 > **Scope:** Release preparation checklist, version tagging, binary packaging, and distribution guidelines.
 > **Last Updated:** Mar 17, 2026
@@ -7,7 +7,7 @@
 
 ## 1. Overview
 
-This document defines the release process for Frames. Releases are cut manually from `master` when the project reaches a shippable state.
+This document defines the release process for Parapet. Releases are cut manually from `master` when the project reaches a shippable state.
 
 **Release types:**
 
@@ -83,7 +83,7 @@ Build the release binary:
 cargo build --workspace --release
 ```
 
-The output binary is at `target/release/frames_bar`.
+The output binary is at `target/release/parapet_bar`.
 
 The binary links against GTK3 dynamically. The target system must have GTK3 installed. This is a reasonable assumption for any Cinnamon desktop.
 
@@ -106,7 +106,7 @@ For each tagged version, create a GitHub release with:
 
 ```bash
 # Generate checksum
-sha256sum target/release/frames_bar > frames_bar.sha256
+sha256sum target/release/parapet_bar > parapet_bar.sha256
 ```
 
 ---
@@ -118,18 +118,18 @@ Follow [Keep a Changelog](https://keepachangelog.com/en/1.1.0/):
 ```markdown
 # Changelog
 
-All notable changes to Frames are documented here.
+All notable changes to Parapet are documented here.
 This project adheres to [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
 ## [0.2.0] - 2026-MM-DD
 ### Added
-- `frames_core/cpu` — CPU usage widget with per-core breakdown
-- `frames_bar/bar` — `_NET_WM_STRUT_PARTIAL` for correct window maximization
+- `parapet_core/cpu` — CPU usage widget with per-core breakdown
+- `parapet_bar/bar` — `_NET_WM_STRUT_PARTIAL` for correct window maximization
 
 ### Fixed
-- `frames_bar/css` — built-in default theme no longer overrides user CSS
+- `parapet_bar/css` — built-in default theme no longer overrides user CSS
 
 ## [0.1.0] - 2026-03-17
 ### Added

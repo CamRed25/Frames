@@ -584,42 +584,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "frames_bar"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "ctrlc",
- "frames_core",
- "fuzzy-matcher",
- "gdk",
- "gio",
- "glib",
- "gtk",
- "libc",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "frames_core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "notify",
- "schemars",
- "serde",
- "serde_json",
- "sysinfo",
- "tempfile",
- "thiserror",
- "toml",
- "tracing",
- "ureq",
- "zbus",
-]
-
-[[package]]
 name = "fsevent-sys"
 version = "4.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1416,6 +1380,42 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
+]
+
+[[package]]
+name = "parapet_bar"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ctrlc",
+ "fuzzy-matcher",
+ "gdk",
+ "gio",
+ "glib",
+ "gtk",
+ "libc",
+ "parapet_core",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "parapet_core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "notify",
+ "schemars",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "tempfile",
+ "thiserror",
+ "toml",
+ "tracing",
+ "ureq",
+ "zbus",
 ]
 
 [[package]]

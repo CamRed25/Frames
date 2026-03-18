@@ -1,6 +1,6 @@
-# Frames — Rule of Law
+# Parapet — Rule of Law
 
-> **Scope:** All contributors (human and AI agents) working on `frames/`.
+> **Scope:** All contributors (human and AI agents) working on `parapet/`.
 > **Last Updated:** Mar 17, 2026
 
 ---
@@ -9,7 +9,7 @@
 
 This document codifies **how** the project's standards are applied, enforced, and evolved. Where the other standards define *what* to do, this one defines *the rules about the rules* — governance, verification, change management, and accountability.
 
-Frames is a ground-up Rust + GTK3 Linux-native status bar. There is no upstream to defer to. Every architectural decision is owned here.
+Parapet is a ground-up Rust + GTK3 Linux-native status bar. There is no upstream to defer to. Every architectural decision is owned here.
 
 ---
 
@@ -128,7 +128,7 @@ Any change to the `Widget` trait, `WidgetData` enum, or widget update protocol:
 2. Must document whether the change is breaking or non-breaking
 3. Breaking changes to `WidgetData` require updating all widget implementations
 
-This rule exists because Frames defines its own widget contract. Boundary drift breaks all widgets silently.
+This rule exists because Parapet defines its own widget contract. Boundary drift breaks all widgets silently.
 
 ---
 
@@ -204,8 +204,8 @@ Reference any relevant crate version, GTK version, or design doc.
 
 Examples:
 ```
-frames_core/cpu: add per-core usage breakdown to CpuData
-frames_bar/bar: set _NET_WM_STRUT_PARTIAL for bottom-anchored bar
+parapet_core/cpu: add per-core usage breakdown to CpuData
+parapet_bar/bar: set _NET_WM_STRUT_PARTIAL for bottom-anchored bar
 config: add widget refresh_interval field with default 1000ms
 ui: fix clock widget text overflow at small font sizes
 ```
@@ -220,7 +220,7 @@ docs/architecture-module-table
 
 ### 4.6 Upstream Policy
 
-Frames has no upstream. All architectural decisions are owned here. When external crates release breaking changes:
+Parapet has no upstream. All architectural decisions are owned here. When external crates release breaking changes:
 
 | Situation | Action |
 |-----------|--------|
@@ -254,9 +254,9 @@ Dead code rots. Remove it when encountered — but move to `doa/`, never delete 
 
 ### 5.3 Display Isolation Enforcement
 
-`frames_core` must not import anything from `gtk`, `gdk`, `glib` (UI), or `x11`. Core contains only system info collection, config parsing, widget data types, and error types.
+`parapet_core` must not import anything from `gtk`, `gdk`, `glib` (UI), or `x11`. Core contains only system info collection, config parsing, widget data types, and error types.
 
-A `frames_core` module that imports a display library is a bug in the crate boundary design.
+A `parapet_core` module that imports a display library is a bug in the crate boundary design.
 
 ---
 
@@ -328,7 +328,7 @@ Always verify exit code 0. Do not proceed to the next task while the build is br
 
 | Severity | Examples | Action |
 |----------|----------|--------|
-| **Critical** | Build broken, GTK import in `frames_core`, unsafe without SAFETY comment | Fix immediately, block all work |
+| **Critical** | Build broken, GTK import in `parapet_core`, unsafe without SAFETY comment | Fix immediately, block all work |
 | **High** | Dead code introduced, tests removed, standards ignored | Fix before proceeding |
 | **Medium** | Missing doc comment, naming violation, futures.md not updated | Fix in current session |
 | **Low** | Minor formatting, optional optimization | Fix when convenient |

@@ -1,6 +1,6 @@
 # Architectural Decision Records
 
-Records closed architectural decisions for Frames. Once closed, a decision is
+Records closed architectural decisions for Parapet. Once closed, a decision is
 not re-litigated. Open the entry and document a superseding decision if
 circumstances change.
 
@@ -20,9 +20,9 @@ circumstances change.
 
 - **Date:** 2026-03-17
 - **Status:** Closed
-- **Decision:** Frames requires X11. Wayland is not supported.
+- **Decision:** Parapet requires X11. Wayland is not supported.
 - **Rationale:** The bar relies on `_NET_WM_STRUT_PARTIAL` and `_NET_WM_WINDOW_TYPE_DOCK` (EWMH X11 properties) to reserve screen space and prevent window overlap. These properties do not exist in the Wayland protocol. The equivalent (`wlr-layer-shell`) is compositor-specific and would require a separate implementation surface. Primary target is Cinnamon on Fedora — an X11 environment (PLATFORM_COMPAT §2).
-- **Consequences:** `DISPLAY` must be set when launching Frames. Wayland sessions are unsupported.
+- **Consequences:** `DISPLAY` must be set when launching Parapet. Wayland sessions are unsupported.
 
 ---
 
@@ -31,7 +31,7 @@ circumstances change.
 - **Date:** 2026-03-17
 - **Status:** Closed
 - **Decision:** Use the `sysinfo` crate (~0.30) for CPU, memory, and network statistics.
-- **Rationale:** Provides CPU usage, per-core breakdown, total/used RAM, swap, and network interface rx/tx in a single crate with a consistent cross-platform API. /proc parsing is handled internally. Alternatives (procfs, psutil-like manual reads) would require maintaining per-distro parsing logic. `sysinfo`'s refresh model aligns with Frames' polling architecture.
+- **Rationale:** Provides CPU usage, per-core breakdown, total/used RAM, swap, and network interface rx/tx in a single crate with a consistent cross-platform API. /proc parsing is handled internally. Alternatives (procfs, psutil-like manual reads) would require maintaining per-distro parsing logic. `sysinfo`'s refresh model aligns with Parapet' polling architecture.
 - **Consequences:** CPU and network widgets require two refresh calls separated by a real time interval to compute a delta; first call returns zero values (WIDGET_API §7.3). Minimum effective poll interval is ~250ms.
 
 ---

@@ -1,4 +1,4 @@
-# Frames — Bar Design
+# Parapet — Bar Design
 
 > **Scope:** Bar window design, X11 EWMH property setup, widget layout system, multi-monitor behavior, and CSS architecture.
 > **Last Updated:** Mar 17, 2026
@@ -7,7 +7,7 @@
 
 ## 1. Overview
 
-The Frames bar is a single GTK3 window positioned at the top or bottom of the screen. It reserves screen space via X11 EWMH strut properties so that other windows maximize correctly around it.
+The Parapet bar is a single GTK3 window positioned at the top or bottom of the screen. It reserves screen space via X11 EWMH strut properties so that other windows maximize correctly around it.
 
 **Design goals:**
 - Zero overlap with maximized windows
@@ -201,8 +201,8 @@ CSS classes are the public API for theming. Targets in priority order:
 .widget-cpu.critical { }
 
 /* Target bar sections */
-.frames-bar .frames-left { }
-.frames-bar .frames-right { }
+.parapet-bar .parapet-left { }
+.parapet-bar .parapet-right { }
 ```
 
 Widget IDs (set via `set_widget_name()`) can also be used for unique per-instance targeting:
