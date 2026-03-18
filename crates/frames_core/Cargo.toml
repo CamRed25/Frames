@@ -20,6 +20,8 @@ chrono.workspace = true
 notify.workspace = true
 ureq.workspace = true
 zbus.workspace = true
+schemars.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

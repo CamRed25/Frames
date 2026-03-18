@@ -9,7 +9,7 @@
 
 use gtk::prelude::*;
 
-use frames_core::{WidgetConfig, WidgetData};
+use frames_core::{CpuConfig, WidgetData};
 
 /// GTK3 renderer for the CPU usage widget.
 pub struct CpuWidget {
@@ -20,7 +20,7 @@ pub struct CpuWidget {
 }
 
 impl CpuWidget {
-    /// Create a new CPU renderer from the given widget config.
+    /// Create a new CPU renderer from the given CPU config.
     ///
     /// The label is wrapped in an `EventBox` so that hover-tooltip tracking
     /// works. CSS classes `.widget` and `.widget-cpu` are applied to the
@@ -32,7 +32,7 @@ impl CpuWidget {
     /// consistency.
     // clippy::unnecessary_wraps: consistent renderer contract — other constructors are fallible
     #[allow(clippy::unnecessary_wraps)]
-    pub fn new(config: &WidgetConfig) -> anyhow::Result<Self> {
+    pub fn new(config: &CpuConfig) -> anyhow::Result<Self> {
         let label = gtk::Label::new(Some("CPU"));
         label.set_widget_name("cpu");
         label.style_context().add_class("widget");
@@ -61,7 +61,12 @@ impl CpuWidget {
     /// When absent (VM or hardware without thermal sensors) the tooltip is
     /// cleared.
     pub fn update(&self, data: &WidgetData) {
-        if let WidgetData::Cpu { usage_pct, temp_celsius, .. } = data {
+        if let WidgetData::Cpu {
+            usage_pct,
+            temp_celsius,
+            ..
+        } = data
+        {
             self.label.set_text(&format!("CPU {usage_pct:.0}%"));
             let ctx = self.label.style_context();
             if *usage_pct >= self.crit_threshold {

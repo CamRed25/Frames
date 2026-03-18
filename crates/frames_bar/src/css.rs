@@ -27,6 +27,7 @@ pub enum ThemeSource<'a> {
     ///
     /// The name must not contain `/` or `..`. An invalid name falls through
     /// to the built-in default with a warning.
+    #[allow(dead_code)] // preserved; callers now pre-resolve names via resolve_active_css_path
     Named(&'a str),
     /// Raw filesystem path (backward-compatible with the `bar.css` config field).
     Path(&'a Path),

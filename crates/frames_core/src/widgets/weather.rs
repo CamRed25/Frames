@@ -124,40 +124,38 @@ impl Widget for WeatherWidget {
         let url = self.build_url();
 
         match self.agent.get(&url).call() {
-            Ok(mut response) => {
-                match response.body_mut().read_json::<ApiResponse>() {
-                    Ok(api) => {
-                        let data = WidgetData::Weather {
-                            temperature: api.current.temperature_2m,
-                            weather_code: api.current.weather_code,
-                            wind_speed: api.current.wind_speed_10m,
-                            humidity: api.current.relative_humidity_2m,
-                            unit: self.unit,
-                        };
-                        self.last = Some(data.clone());
-                        Ok(data)
-                    }
-                    Err(e) => {
-                        tracing::warn!(
-                            widget = self.name,
-                            error = %e,
-                            "weather JSON parse failed; returning stale data"
-                        );
-                        self.last.clone().ok_or_else(|| {
-                            FramesError::Http(format!("json parse error: {e}"))
-                        })
-                    }
+            Ok(mut response) => match response.body_mut().read_json::<ApiResponse>() {
+                Ok(api) => {
+                    let data = WidgetData::Weather {
+                        temperature: api.current.temperature_2m,
+                        weather_code: api.current.weather_code,
+                        wind_speed: api.current.wind_speed_10m,
+                        humidity: api.current.relative_humidity_2m,
+                        unit: self.unit,
+                    };
+                    self.last = Some(data.clone());
+                    Ok(data)
                 }
-            }
+                Err(e) => {
+                    tracing::warn!(
+                        widget = self.name,
+                        error = %e,
+                        "weather JSON parse failed; returning stale data"
+                    );
+                    self.last
+                        .clone()
+                        .ok_or_else(|| FramesError::Http(format!("json parse error: {e}")))
+                }
+            },
             Err(e) => {
                 tracing::warn!(
                     widget = self.name,
                     error = %e,
                     "weather HTTP request failed; returning stale data"
                 );
-                self.last.clone().ok_or_else(|| {
-                    FramesError::Http(format!("http request failed: {e}"))
-                })
+                self.last
+                    .clone()
+                    .ok_or_else(|| FramesError::Http(format!("http request failed: {e}")))
             }
         }
     }

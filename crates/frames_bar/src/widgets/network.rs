@@ -5,7 +5,7 @@
 
 use gtk::prelude::*;
 
-use frames_core::{WidgetConfig, WidgetData};
+use frames_core::{NetworkConfig, WidgetData};
 
 /// GTK3 renderer for the network widget.
 pub struct NetworkWidget {
@@ -14,7 +14,7 @@ pub struct NetworkWidget {
 }
 
 impl NetworkWidget {
-    /// Create a new network renderer from the given widget config.
+    /// Create a new network renderer from the given network config.
     ///
     /// # Errors
     ///
@@ -22,7 +22,7 @@ impl NetworkWidget {
     /// consistency.
     // clippy::unnecessary_wraps: consistent renderer contract — other constructors are fallible
     #[allow(clippy::unnecessary_wraps)]
-    pub fn new(config: &WidgetConfig) -> anyhow::Result<Self> {
+    pub fn new(config: &NetworkConfig) -> anyhow::Result<Self> {
         let label = gtk::Label::new(Some("NET"));
         label.set_widget_name("network");
         label.style_context().add_class("widget");

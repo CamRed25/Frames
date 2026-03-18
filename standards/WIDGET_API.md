@@ -20,7 +20,7 @@ The contract is strict:
 
 ```rust
 // frames_core/src/widget.rs
-pub const WIDGET_API_VERSION: &str = "1.7.0";
+pub const WIDGET_API_VERSION: &str = "1.7.1";
 ```
 
 **Versioning policy:**
@@ -289,6 +289,8 @@ Widgets are responsible for managing their own internal state between `update()`
 
 If `update()` encounters a transient error (e.g., brief `/proc` read failure), it should return the last known good `WidgetData` rather than an error. Only return `Err` for persistent, unrecoverable failures.
 
+Returning the last cached `WidgetData` is also correct when no new data has arrived since the previous `update()` call (e.g., a channel-driven widget whose `mpsc` channel has no pending messages). An empty channel is not a failure condition. `Err` should only be returned for persistent, unrecoverable failures — not for "nothing changed since last tick."
+
 ### 7.3 First-Call Behavior
 
 On the first call to `update()`, some widgets (CPU, network) have no previous sample to compare against. These widgets should return a zero/placeholder value on first call rather than an error:
@@ -307,6 +309,33 @@ pub fn update(&mut self) -> Result<WidgetData, FramesError> {
 }
 ```
 
+### 7.4 Stateful Widgets with Background Threads
+
+A widget may own a background thread and an `mpsc::Receiver` when event-driven updates are preferable to polling (e.g., audio volume via `pactl subscribe`).
+
+**Required pattern:**
+
+```rust
+pub struct ExampleWidget {
+    cached:  WidgetData,
+    rx:      std::sync::Mutex<std::sync::mpsc::Receiver<SomeData>>,
+    _thread: std::thread::JoinHandle<()>,
+}
+```
+
+**`Send + Sync` obligation:** `std::sync::mpsc::Receiver<T>` is `Send` but `!Sync`. Wrap it in `std::sync::Mutex<Receiver<T>>` to satisfy the `Sync` bound required by `Widget: Send + Sync`. `Mutex<T>: Sync where T: Send`. `JoinHandle<T>` is `Send + Sync`.
+
+**`update()` contract for channel-driven widgets:**
+1. Acquire the lock on the `Receiver`: `self.rx.lock().expect("… poisoned")`.
+2. Drain the channel in a loop using `try_recv()`.
+3. On `TryRecvError::Empty` — break; return cached value. This is normal.
+4. On `TryRecvError::Disconnected` — log `tracing::warn!`; break; return cached value. The thread has exited (external process absent, OS restart, etc.). Do not return `Err` — this is a degraded but recoverable state.
+5. Drop the lock before cloning or returning the cached value.
+
+**Thread naming:** Use `std::thread::Builder::new().name("frames-<purpose>")` so threads appear with meaningful names in debuggers and OS process listings.
+
+**Thread lifecycle:** The background thread exits when `tx.send()` fails because the widget was dropped (receiver gone) or when its external subprocess exits. Storing `_thread: JoinHandle` (not calling `join()` in `Drop`) is correct for bar-lifetime widgets — the OS reclaims the thread when the process exits. Implement `Drop` with `join()` only if the widget can outlive the bar or if the thread holds OS resources that must be released before process exit.
+
 ---
 
 ## 8. Cross-References
@@ -322,6 +351,11 @@ pub fn update(&mut self) -> Result<WidgetData, FramesError> {
 ---
 
 ## Changelog
+
+### 1.7.1 (2026-03-18)
+- Clarified §7.2 stale-data policy: returning cached data when an `mpsc` channel has no pending messages is valid and expected, not an error.
+- Added §7.4 "Stateful Widgets with Background Threads" — documents the `Mutex<Receiver<T>>` pattern for `Send + Sync` compliance, `update()` channel-drain contract, thread naming conventions, and lifecycle policy.
+- Patch bump (documentation only; no `WidgetData` or trait signature change).
 
 ### 1.7.0 (2026-03-18)
 - Added `all_disks: Vec<DiskEntry>` to `WidgetData::Disk` — full list of real mounted filesystems for hover tooltip

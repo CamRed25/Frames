@@ -11,7 +11,7 @@ use crate::error::FramesError;
 ///
 /// Bump this string in the same commit as any change to [`Widget`] or
 /// [`WidgetData`]. See `WIDGET_API.md §2` for the versioning policy.
-pub const WIDGET_API_VERSION: &str = "1.7.0";
+pub const WIDGET_API_VERSION: &str = "1.7.1";
 
 /// Uniform interface for all widget data providers.
 ///
@@ -337,8 +337,16 @@ mod tests {
         let cloned = original.clone();
         match (original, cloned) {
             (
-                WidgetData::Weather { temperature: t1, weather_code: w1, .. },
-                WidgetData::Weather { temperature: t2, weather_code: w2, .. },
+                WidgetData::Weather {
+                    temperature: t1,
+                    weather_code: w1,
+                    ..
+                },
+                WidgetData::Weather {
+                    temperature: t2,
+                    weather_code: w2,
+                    ..
+                },
             ) => {
                 assert!((t1 - t2).abs() < f32::EPSILON);
                 assert_eq!(w1, w2);
@@ -359,8 +367,16 @@ mod tests {
         let cloned = original.clone();
         match (original, cloned) {
             (
-                WidgetData::Media { title: t1, status: s1, .. },
-                WidgetData::Media { title: t2, status: s2, .. },
+                WidgetData::Media {
+                    title: t1,
+                    status: s1,
+                    ..
+                },
+                WidgetData::Media {
+                    title: t2,
+                    status: s2,
+                    ..
+                },
             ) => {
                 assert_eq!(t1, t2);
                 assert_eq!(s1, s2);

@@ -5,7 +5,7 @@
 
 use gtk::prelude::*;
 
-use frames_core::{WidgetConfig, WidgetData};
+use frames_core::{BrightnessConfig, WidgetData};
 
 /// GTK3 renderer for the brightness widget.
 pub struct BrightnessWidget {
@@ -14,7 +14,7 @@ pub struct BrightnessWidget {
 }
 
 impl BrightnessWidget {
-    /// Create a new brightness renderer from the given widget config.
+    /// Create a new brightness renderer from the given brightness config.
     ///
     /// # Errors
     ///
@@ -22,14 +22,14 @@ impl BrightnessWidget {
     /// consistency.
     // clippy::unnecessary_wraps: consistent renderer contract
     #[allow(clippy::unnecessary_wraps)]
-    pub fn new(config: &WidgetConfig) -> anyhow::Result<Self> {
+    pub fn new(config: &BrightnessConfig) -> anyhow::Result<Self> {
         let label = gtk::Label::new(Some("BRI --"));
         label.set_widget_name("brightness");
         label.style_context().add_class("widget");
         label.style_context().add_class("widget-brightness");
         Ok(Self {
             label,
-            show_icon: config.show_icon.unwrap_or(false),
+            show_icon: config.show_icon.unwrap_or(true),
         })
     }
 

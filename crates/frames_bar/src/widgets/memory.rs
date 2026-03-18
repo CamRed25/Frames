@@ -7,7 +7,7 @@
 
 use gtk::prelude::*;
 
-use frames_core::{WidgetConfig, WidgetData};
+use frames_core::{MemoryConfig, WidgetData};
 
 /// GTK3 renderer for the memory widget.
 pub struct MemoryWidget {
@@ -16,7 +16,7 @@ pub struct MemoryWidget {
 }
 
 impl MemoryWidget {
-    /// Create a new memory renderer from the given widget config.
+    /// Create a new memory renderer from the given memory config.
     ///
     /// # Errors
     ///
@@ -24,7 +24,7 @@ impl MemoryWidget {
     /// consistency.
     // clippy::unnecessary_wraps: consistent renderer contract — other constructors are fallible
     #[allow(clippy::unnecessary_wraps)]
-    pub fn new(config: &WidgetConfig) -> anyhow::Result<Self> {
+    pub fn new(config: &MemoryConfig) -> anyhow::Result<Self> {
         let label = gtk::Label::new(Some("MEM"));
         label.set_widget_name("memory");
         label.style_context().add_class("widget");

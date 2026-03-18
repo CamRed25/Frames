@@ -144,10 +144,7 @@ impl MediaWidget {
     /// Returns `false` if the key is absent or the value is not a D-Bus
     /// boolean.
     fn prop_bool(props: &HashMap<String, OwnedValue>, key: &str) -> bool {
-        props
-            .get(key)
-            .and_then(|v| bool::try_from(v.clone()).ok())
-            .unwrap_or(false)
+        props.get(key).and_then(|v| bool::try_from(v.clone()).ok()).unwrap_or(false)
     }
 
     /// Extract `(title, artist)` from the `Metadata` property.
@@ -293,7 +290,12 @@ mod tests {
     fn media_widget_stopped_helper_returns_correct_variant() {
         let data = MediaWidget::stopped();
         match data {
-            WidgetData::Media { status, title, artist, .. } => {
+            WidgetData::Media {
+                status,
+                title,
+                artist,
+                ..
+            } => {
                 assert_eq!(status, PlaybackStatus::Stopped);
                 assert!(title.is_empty());
                 assert!(artist.is_empty());

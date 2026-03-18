@@ -93,7 +93,7 @@ frames_core/
 │   │   ├── media.rs    ← MPRIS2 playback info via zbus (D-Bus session bus)
 │   │   └── workspaces.rs ← Workspace count/name stubs (X11 query handled in frames_bar)
 │   ├── poll.rs         ← Poller — interval-based widget update scheduling
-│   ├── config.rs       ← FramesConfig, BarConfig, WidgetConfig — TOML config; ConfigWatcher — notify-backed file watcher for hot-reload
+│   ├── config.rs       ← FramesConfig, BarConfig, WidgetConfig, WidgetKind (+ 13 per-widget structs) — TOML config; ConfigWatcher — notify-backed file watcher for hot-reload
 │   └── error.rs        ← FramesError — crate-level error types (thiserror)
 ```
 
@@ -151,7 +151,16 @@ Config is loaded from `~/.config/frames/config.toml`. The structure:
 FramesConfig
 ├── bar: BarConfig           ← position, height, monitor, CSS path
 └── widgets: Vec<WidgetConfig>  ← ordered list of widget definitions
+    └── kind: WidgetKind     ← internal serde tag; one of 13 typed variants
+        ├── Clock(ClockConfig)
+        ├── Cpu(CpuConfig)
+        ├── ...
+        └── Separator(SeparatorConfig)
 ```
+
+`WidgetConfig` holds the common fields (`position`, `interval`, `label`, `on_click`, etc.) shared by all widgets, plus a `kind: WidgetKind` field that carries the widget-specific fields. `WidgetKind` is an internally-tagged serde enum (`#[serde(tag = "type")]`): the `type` key in TOML selects the variant and each variant struct has `#[serde(deny_unknown_fields)]` so misplaced fields are rejected at parse time rather than silently ignored.
+
+The `WidgetKind` enum drives dispatch in `frames_bar::main::build_widget()` — the match exhaustiveness guarantees every widget type has a renderer.
 
 See CONFIG_MODEL.md for full field documentation.
 

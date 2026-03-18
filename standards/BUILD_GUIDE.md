@@ -37,6 +37,10 @@ These libraries must be present on the build host. They are detected via `pkg-co
 > **Note:** The `ureq` (HTTP) and `zbus` (D-Bus) crates added in v0.1.0 are pure Rust and
 > require no additional system libraries. `zbus` communicates with the D-Bus session daemon
 > over a Unix socket — `libdbus` is not required.
+>
+> **Note:** `schemars` (JSON Schema derive) and `serde_json` added in v0.1.x are pure Rust
+> with no system library prerequisites. They are used only by `frames_core` for schema
+> generation and are not linked into the GTK3 display path.
 
 ```bash
 # Fedora
@@ -98,6 +102,8 @@ chrono = { version = "~0.4", features = ["serde"] }
 notify = "~6.1"
 ureq = { version = "~3.2", features = ["json"] }
 zbus = { version = "~5.1", features = ["blocking-api"] }
+schemars = "~0.8"
+serde_json = "~1.0"
 gtk = { version = "~0.18", features = ["v3_22"] }
 gdk = "~0.18"
 glib = "~0.18"

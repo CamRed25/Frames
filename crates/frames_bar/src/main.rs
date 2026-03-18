@@ -2,7 +2,8 @@
 //!
 //! Startup sequence:
 //! 1. Initialize tracing
-//! 2. Parse `--theme <name>` CLI override
+//! 2. Check for early-exit subcommands (`--init-config`, `--dump-schema`), then
+//!    parse `--theme <name>` CLI override
 //! 3. Load `FramesConfig` from TOML (env `FRAMES_CONFIG` or default path)
 //! 4. Initialize GTK3
 //! 5. Create the `Bar` window
@@ -28,8 +29,35 @@ use gdk::prelude::*;
 use glib::ControlFlow;
 use gtk::prelude::*;
 
-use frames_core::config::{BarSection, ConfigWatcher, WidgetConfig};
+use frames_core::config::{BarSection, ConfigWatcher, WidgetConfig, WidgetKind};
 use frames_core::{FramesConfig, Poller, WidgetData};
+
+/// Resolve the active CSS file path from the current config and CLI theme override.
+///
+/// Returns `Some(path)` when a named theme or explicit `bar.css` path resolves
+/// to a file, `None` when the built-in default theme is active. The returned
+/// path is suitable for [`css::load_theme`] and [`frames_core::config::ConfigWatcher::new`].
+///
+/// Must be called after `gtk::init()` when a theme name is involved, because
+/// [`css::resolve_theme_variant`] reads GTK settings to select dark/light variants.
+///
+/// # Parameters
+/// - `config` — current [`FramesConfig`]; reads `bar.theme` and `bar.css`.
+/// - `cli_theme` — optional `--theme` CLI override; takes precedence over `bar.theme`.
+fn resolve_active_css_path(config: &FramesConfig, cli_theme: Option<&str>) -> Option<PathBuf> {
+    let effective_name = cli_theme.or(config.bar.theme.as_deref()).map(css::resolve_theme_variant);
+    match effective_name.as_deref() {
+        Some(name) => {
+            let p = css::resolve_theme_path(name);
+            if p.as_os_str().is_empty() {
+                None
+            } else {
+                Some(p)
+            }
+        }
+        None => config.bar.css.as_deref().map(PathBuf::from),
+    }
+}
 
 #[allow(clippy::too_many_lines)] // GTK startup sequence is inherently sequential; extracting into subfunctions would obscure the ordered startup steps
 fn main() -> anyhow::Result<()> {
@@ -38,14 +66,27 @@ fn main() -> anyhow::Result<()> {
     // ── 1. Tracing ──────────────────────────────────────────────────────────
     tracing_subscriber::fmt::init();
 
-    // ── 2. CLI args — --theme <name> ────────────────────────────────────────
+    // ── 2. CLI args ──────────────────────────────────────────────────────────
+    // Collect once; used for early-exit subcommands and --theme parsing.
+    let raw_args: Vec<String> = std::env::args().skip(1).collect();
+
+    // Early-exit subcommands — run before config load and before GTK init.
+    if raw_args.contains(&"--init-config".to_string()) {
+        init_config().context("--init-config failed")?;
+        return Ok(());
+    }
+    if raw_args.contains(&"--dump-schema".to_string()) {
+        dump_schema();
+        return Ok(());
+    }
+
     // `--theme <name>` overrides bar.theme and bar.css in config.
     let cli_theme: Option<String> = {
-        let mut args = std::env::args().skip(1);
+        let mut iter = raw_args.iter();
         let mut found = None;
-        while let Some(arg) = args.next() {
+        while let Some(arg) = iter.next() {
             if arg == "--theme" {
-                found = args.next();
+                found = iter.next().cloned();
                 break;
             }
         }
@@ -57,10 +98,7 @@ fn main() -> anyhow::Result<()> {
         .map_or_else(|_| FramesConfig::default_path(), std::path::PathBuf::from);
 
     let config = match FramesConfig::load(&config_path) {
-        Ok(c) => {
-            c.validate().context("config validation failed")?;
-            c
-        }
+        Ok(c) => c, // validate() (including path expansion) is called inside load()
         Err(frames_core::ConfigError::NotFound { path }) => {
             anyhow::bail!(
                 "config file not found: {}\n\
@@ -84,33 +122,11 @@ fn main() -> anyhow::Result<()> {
     //
     // Priority: --theme CLI > bar.theme config > bar.css raw path > built-in.
     // After GTK init so that resolve_theme_variant can read GtkSettings.
-    let effective_theme_name: Option<String> = cli_theme
-        .as_deref()
-        .or(config.bar.theme.as_deref())
-        .map(css::resolve_theme_variant);
-
-    let theme_source: css::ThemeSource<'_> = match effective_theme_name.as_deref() {
-        Some(name) => css::ThemeSource::Named(name),
-        None => match config.bar.css.as_deref() {
-            Some(path) => css::ThemeSource::Path(std::path::Path::new(path)),
-            None => css::ThemeSource::Default,
-        },
+    let initial_css_path = resolve_active_css_path(&config, cli_theme.as_deref());
+    let theme_source = match &initial_css_path {
+        Some(p) => css::ThemeSource::Path(p.as_path()),
+        None => css::ThemeSource::Default,
     };
-
-    // Compute the active CSS file path for the hot-reload watcher (Steps 8–9).
-    let active_css_path: Option<PathBuf> = match &theme_source {
-        css::ThemeSource::Named(name) => {
-            let p = css::resolve_theme_path(name);
-            if p.as_os_str().is_empty() {
-                None
-            } else {
-                Some(p)
-            }
-        }
-        css::ThemeSource::Path(p) => Some(p.to_path_buf()),
-        css::ThemeSource::Default => None,
-    };
-
     let provider: Rc<RefCell<gtk::CssProvider>> =
         Rc::new(RefCell::new(css::load_theme(theme_source)));
     css::apply_provider(&provider.borrow());
@@ -173,27 +189,32 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
+    let active_css_path: Rc<RefCell<Option<PathBuf>>> = Rc::new(RefCell::new(initial_css_path));
     // Optional watcher on the active CSS file (only when a file-based theme is used).
-    let css_watcher: Option<ConfigWatcher> =
-        active_css_path.as_deref().and_then(|p| match ConfigWatcher::new(p) {
-            Ok(w) => {
-                tracing::info!(path = %p.display(), "CSS theme watcher started");
-                Some(w)
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, path = %p.display(),
+    let css_watcher: Rc<RefCell<Option<ConfigWatcher>>> =
+        Rc::new(RefCell::new(active_css_path.borrow().as_deref().and_then(|p| {
+            match ConfigWatcher::new(p) {
+                Ok(w) => {
+                    tracing::info!(path = %p.display(), "CSS theme watcher started");
+                    Some(w)
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, path = %p.display(),
                     "could not start CSS theme watcher; CSS hot-reload disabled");
-                None
+                    None
+                }
             }
-        });
+        })));
 
-    if config_watcher.is_some() || css_watcher.is_some() {
+    if config_watcher.is_some() || css_watcher.borrow().is_some() {
         let bar = Rc::clone(&bar_rc);
         let poller = Rc::clone(&poller);
         let renderers = Rc::clone(&renderers);
         let self_poll_ids = Rc::clone(&self_poll_ids);
         let config_path = config_path.clone();
         let provider = Rc::clone(&provider);
+        let active_css_path_rc = Rc::clone(&active_css_path);
+        let css_watcher_rc = Rc::clone(&css_watcher);
         let mut last_reload = Instant::now();
 
         glib::timeout_add_local(Duration::from_millis(500), move || {
@@ -224,6 +245,23 @@ fn main() -> anyhow::Result<()> {
                             *poller.borrow_mut() = new_poller;
                             *renderers.borrow_mut() = new_renderers;
 
+                            // Swap CSS provider and watcher if the theme path changed.
+                            let new_css =
+                                resolve_active_css_path(&new_config, cli_theme.as_deref());
+                            if new_css != *active_css_path_rc.borrow() {
+                                let new_provider = match &new_css {
+                                    Some(p) => css::load_theme(css::ThemeSource::Path(p.as_path())),
+                                    None => css::load_theme(css::ThemeSource::Default),
+                                };
+                                css::remove_provider(&provider.borrow());
+                                css::apply_provider(&new_provider);
+                                *provider.borrow_mut() = new_provider;
+                                *css_watcher_rc.borrow_mut() =
+                                    new_css.as_deref().and_then(|p| ConfigWatcher::new(p).ok());
+                                *active_css_path_rc.borrow_mut() = new_css;
+                                tracing::info!("CSS theme swapped on config reload");
+                            }
+
                             bar.show();
                             last_reload = Instant::now();
                             tracing::info!("config reloaded successfully");
@@ -236,13 +274,19 @@ fn main() -> anyhow::Result<()> {
             }
 
             // CSS file change — reapply theme without restarting.
-            if let (Some(ref css_w), Some(ref css_path)) = (&css_watcher, &active_css_path) {
-                if css_w.has_changed() {
-                    let new_provider = css::load_theme(css::ThemeSource::Path(css_path.as_path()));
-                    css::remove_provider(&provider.borrow());
-                    css::apply_provider(&new_provider);
-                    *provider.borrow_mut() = new_provider;
-                    tracing::info!(path = %css_path.display(), "CSS theme hot-reloaded");
+            {
+                let css_w_borrow = css_watcher_rc.borrow();
+                if let Some(ref css_w) = *css_w_borrow {
+                    if css_w.has_changed() {
+                        if let Some(ref css_path) = *active_css_path_rc.borrow() {
+                            let new_provider =
+                                css::load_theme(css::ThemeSource::Path(css_path.as_path()));
+                            css::remove_provider(&provider.borrow());
+                            css::apply_provider(&new_provider);
+                            *provider.borrow_mut() = new_provider;
+                            tracing::info!(path = %css_path.display(), "CSS theme hot-reloaded");
+                        }
+                    }
                 }
             }
 
@@ -252,7 +296,10 @@ fn main() -> anyhow::Result<()> {
 
     // ── 12. Bar show + main loop ─────────────────────────────────────────────
     bar_rc.show();
-    tracing::debug!("bar ready, entering main loop ({:.1}ms total)", t0.elapsed().as_secs_f64() * 1000.0);
+    tracing::debug!(
+        "bar ready, entering main loop ({:.1}ms total)",
+        t0.elapsed().as_secs_f64() * 1000.0
+    );
     gtk::main();
     Ok(())
 }
@@ -429,12 +476,31 @@ fn build_all_widgets(
             }
             Err(e) => {
                 tracing::warn!(
-                    widget = widget_config.widget_type,
+                    widget = widget_kind_name(&widget_config.kind),
                     error = %e,
                     "failed to create widget; skipping"
                 );
             }
         }
+    }
+}
+
+/// Return the string name of a [`WidgetKind`] variant, matching the TOML `type` key.
+fn widget_kind_name(kind: &WidgetKind) -> &'static str {
+    match kind {
+        WidgetKind::Clock(_) => "clock",
+        WidgetKind::Cpu(_) => "cpu",
+        WidgetKind::Memory(_) => "memory",
+        WidgetKind::Network(_) => "network",
+        WidgetKind::Battery(_) => "battery",
+        WidgetKind::Disk(_) => "disk",
+        WidgetKind::Volume(_) => "volume",
+        WidgetKind::Brightness(_) => "brightness",
+        WidgetKind::Weather(_) => "weather",
+        WidgetKind::Media(_) => "media",
+        WidgetKind::Workspaces(_) => "workspaces",
+        WidgetKind::Launcher(_) => "launcher",
+        WidgetKind::Separator(_) => "separator",
     }
 }
 
@@ -451,96 +517,99 @@ fn build_all_widgets(
 #[allow(clippy::too_many_lines)] // match arms are the canonical widget registry; refactoring into subfunctions would obscure the pattern
 fn build_widget(bar: &bar::Bar, poller: &mut Poller, config: &WidgetConfig) -> BuildWidgetResult {
     let section = config.position.clone();
-    let name = config.label.clone().unwrap_or_else(|| config.widget_type.clone());
+    let name = config
+        .label
+        .clone()
+        .unwrap_or_else(|| widget_kind_name(&config.kind).to_string());
 
-    match config.widget_type.as_str() {
-        "clock" => {
+    match &config.kind {
+        WidgetKind::Clock(clock) => {
             let interval = config.interval.unwrap_or(1000);
-            let format = config.format.clone().unwrap_or_else(|| "%H:%M:%S".to_string());
+            let format = clock.format.clone().unwrap_or_else(|| "%H:%M:%S".to_string());
 
             let core_widget = frames_core::widgets::clock::ClockWidget::new(&name, &format);
             poller.register(Box::new(core_widget), interval);
 
-            let renderer = widgets::clock::ClockWidget::new(config)
+            let renderer = widgets::clock::ClockWidget::new(clock)
                 .context("clock renderer construction failed")?;
             add_to_bar(bar, renderer.widget(), config, &section);
 
             Ok((Some(Rc::new(ClockRenderer { name, renderer })), None))
         }
-        "cpu" => {
+        WidgetKind::Cpu(cpu) => {
             let interval = config.interval.unwrap_or(2000);
 
             let core_widget = frames_core::widgets::cpu::CpuWidget::new(&name)?;
             poller.register(Box::new(core_widget), interval);
 
             let renderer =
-                widgets::cpu::CpuWidget::new(config).context("cpu renderer construction failed")?;
+                widgets::cpu::CpuWidget::new(cpu).context("cpu renderer construction failed")?;
             add_to_bar(bar, renderer.widget(), config, &section);
 
             Ok((Some(Rc::new(CpuRenderer { name, renderer })), None))
         }
-        "memory" => {
+        WidgetKind::Memory(memory) => {
             let interval = config.interval.unwrap_or(5000);
 
             let core_widget = frames_core::widgets::memory::MemoryWidget::new(&name)?;
             poller.register(Box::new(core_widget), interval);
 
-            let renderer = widgets::memory::MemoryWidget::new(config)
+            let renderer = widgets::memory::MemoryWidget::new(memory)
                 .context("memory renderer construction failed")?;
             add_to_bar(bar, renderer.widget(), config, &section);
 
             Ok((Some(Rc::new(MemoryRenderer { name, renderer })), None))
         }
-        "network" => {
+        WidgetKind::Network(network) => {
             let interval = config.interval.unwrap_or(2000);
 
-            let interface = config.interface.clone().unwrap_or_else(|| "eth0".to_string());
+            let interface = network.interface.clone().unwrap_or_else(|| "eth0".to_string());
             let core_widget = frames_core::widgets::network::NetworkWidget::new(&name, &interface)?;
             poller.register(Box::new(core_widget), interval);
 
-            let renderer = widgets::network::NetworkWidget::new(config)
+            let renderer = widgets::network::NetworkWidget::new(network)
                 .context("network renderer construction failed")?;
             add_to_bar(bar, renderer.widget(), config, &section);
 
             Ok((Some(Rc::new(NetworkRenderer { name, renderer })), None))
         }
-        "battery" => {
+        WidgetKind::Battery(battery) => {
             let interval = config.interval.unwrap_or(30_000);
 
             let core_widget = frames_core::widgets::battery::BatteryWidget::new(&name);
             poller.register(Box::new(core_widget), interval);
 
-            let renderer = widgets::battery::BatteryWidget::new(config)
+            let renderer = widgets::battery::BatteryWidget::new(battery)
                 .context("battery renderer construction failed")?;
             add_to_bar(bar, renderer.widget(), config, &section);
 
             Ok((Some(Rc::new(BatteryRenderer { name, renderer })), None))
         }
-        "volume" => {
+        WidgetKind::Volume(volume) => {
             let interval = config.interval.unwrap_or(2000);
 
             let core_widget = frames_core::widgets::volume::VolumeWidget::new(&name);
             poller.register(Box::new(core_widget), interval);
 
-            let renderer = widgets::volume::VolumeWidget::new(config)
+            let renderer = widgets::volume::VolumeWidget::new(volume)
                 .context("volume renderer construction failed")?;
             add_to_bar(bar, renderer.widget(), config, &section);
 
             Ok((Some(Rc::new(VolumeRenderer { name, renderer })), None))
         }
-        "brightness" => {
+        WidgetKind::Brightness(brightness) => {
             let interval = config.interval.unwrap_or(5000);
 
             let core_widget = frames_core::widgets::brightness::BrightnessWidget::new(&name);
             poller.register(Box::new(core_widget), interval);
 
-            let renderer = widgets::brightness::BrightnessWidget::new(config)
+            let renderer = widgets::brightness::BrightnessWidget::new(brightness)
                 .context("brightness renderer construction failed")?;
             add_to_bar(bar, renderer.widget(), config, &section);
 
             Ok((Some(Rc::new(BrightnessRenderer { name, renderer })), None))
         }
-        "workspaces" => {
+        WidgetKind::Workspaces(_) => {
             // WorkspacesWidget is self-polling; it manages its own glib timer.
             let renderer = Rc::new(
                 widgets::workspaces::WorkspacesWidget::new()
@@ -564,21 +633,21 @@ fn build_widget(bar: &bar::Bar, poller: &mut Poller, config: &WidgetConfig) -> B
             // Workspaces does not participate in the Poller dispatch loop.
             Ok((None, Some(source_id)))
         }
-        "launcher" => {
+        WidgetKind::Launcher(launcher) => {
             // LauncherWidget is self-contained; it manages its own GTK signals.
             let renderer = Rc::new(
-                widgets::launcher::LauncherWidget::new(config)
+                widgets::launcher::LauncherWidget::new(launcher)
                     .context("launcher renderer construction failed")?,
             );
             add_to_bar(bar, renderer.widget(), config, &section);
             // Launcher does not participate in the Poller dispatch loop.
             Ok((None, None))
         }
-        "separator" => {
+        WidgetKind::Separator(sep) => {
             // Thin visual divider between widgets. Renders a configurable glyph
             // (default "|") styled by .widget-separator in the theme. The glyph
-            // is set via the `format` field in config. Does not poll or dispatch.
-            let glyph = config.format.as_deref().unwrap_or("|");
+            // is set via the `format` field in SeparatorConfig. Does not poll or dispatch.
+            let glyph = sep.format.as_deref().unwrap_or("|");
             let label = gtk::Label::new(Some(glyph));
             label.set_widget_name("separator");
             label.style_context().add_class("widget-separator");
@@ -588,45 +657,40 @@ fn build_widget(bar: &bar::Bar, poller: &mut Poller, config: &WidgetConfig) -> B
             bar.add_widget(label.upcast_ref(), &section);
             Ok((None, None))
         }
-        "weather" => {
+        WidgetKind::Weather(weather) => {
             let interval = config.interval.unwrap_or(1_800_000);
-            let latitude = config.latitude.unwrap_or(0.0);
-            let longitude = config.longitude.unwrap_or(0.0);
-            let unit = match config.units.as_deref().unwrap_or("celsius") {
+            let latitude = weather.latitude.unwrap_or(0.0);
+            let longitude = weather.longitude.unwrap_or(0.0);
+            let unit = match weather.units.as_deref().unwrap_or("celsius") {
                 "fahrenheit" => frames_core::widget::TempUnit::Fahrenheit,
                 _ => frames_core::widget::TempUnit::Celsius,
             };
-            let core_widget = frames_core::widgets::weather::WeatherWidget::new(
-                &name, latitude, longitude, unit,
-            );
+            let core_widget =
+                frames_core::widgets::weather::WeatherWidget::new(&name, latitude, longitude, unit);
             poller.register(Box::new(core_widget), interval);
-            let renderer = widgets::weather::WeatherWidget::new(config)
+            let renderer = widgets::weather::WeatherWidget::new(weather)
                 .context("weather renderer construction failed")?;
             add_to_bar(bar, renderer.widget(), config, &section);
             Ok((Some(Rc::new(WeatherRenderer { name, renderer })), None))
         }
-        "media" => {
+        WidgetKind::Media(media) => {
             let interval = config.interval.unwrap_or(2000);
             let core_widget = frames_core::widgets::media::MediaWidget::new(&name);
             poller.register(Box::new(core_widget), interval);
-            let renderer = widgets::media::MediaWidget::new(config)
+            let renderer = widgets::media::MediaWidget::new(media)
                 .context("media renderer construction failed")?;
             add_to_bar(bar, renderer.widget(), config, &section);
             Ok((Some(Rc::new(MediaRenderer { name, renderer })), None))
         }
-        "disk" => {
+        WidgetKind::Disk(disk) => {
             let interval = config.interval.unwrap_or(30_000);
-            let mount = config.mount.clone().unwrap_or_else(|| "/".to_string());
+            let mount = disk.mount.clone().unwrap_or_else(|| "/".to_string());
             let core_widget = frames_core::widgets::disk::DiskWidget::new(&name, &mount)?;
             poller.register(Box::new(core_widget), interval);
-            let renderer = widgets::disk::DiskWidget::new(config)
+            let renderer = widgets::disk::DiskWidget::new(disk)
                 .context("disk renderer construction failed")?;
             add_to_bar(bar, renderer.widget(), config, &section);
             Ok((Some(Rc::new(DiskRenderer { name, renderer })), None))
-        }
-        other => {
-            tracing::warn!(widget_type = other, "unknown widget type in config; skipping");
-            Ok((None, None))
         }
     }
 }
@@ -704,4 +768,116 @@ fn spawn_shell(cmd: &str) {
     if let Err(e) = std::process::Command::new("sh").args(["-c", cmd]).spawn() {
         tracing::warn!(command = cmd, error = %e, "widget action command failed to spawn");
     }
+}
+
+// ── Starter config ────────────────────────────────────────────────────────────
+
+/// Well-commented starter config written by `--init-config`.
+///
+/// Matches the complete example from `CONFIG_MODEL.md §6`.
+const STARTER_CONFIG: &str = r#"# Frames status bar configuration
+# Generated by `frames_bar --init-config`
+#
+# Full field reference: https://github.com/CamRed25/Frames/blob/master/standards/CONFIG_MODEL.md
+# Generate JSON Schema for editor autocomplete: frames_bar --dump-schema
+
+[bar]
+position = "top"       # "top" | "bottom"
+height = 28            # bar height in pixels
+monitor = "primary"    # "primary" | integer (0-based GDK monitor index)
+# css = "~/.config/frames/frames.css"   # path to a custom CSS file (~ is expanded)
+widget_spacing = 4     # pixel gap between adjacent widgets
+
+# ── Left section ──────────────────────────────────────────────────────────────
+
+[[widgets]]
+type = "workspaces"
+position = "left"
+show_names = true
+
+# ── Centre section ────────────────────────────────────────────────────────────
+
+[[widgets]]
+type = "clock"
+position = "center"
+format = "%a %b %d  %H:%M"
+
+# ── Right section ─────────────────────────────────────────────────────────────
+
+[[widgets]]
+type = "cpu"
+position = "right"
+interval = 2000
+warn_threshold = 80.0
+crit_threshold = 95.0
+
+[[widgets]]
+type = "memory"
+position = "right"
+interval = 3000
+format = "percent"
+
+[[widgets]]
+type = "network"
+position = "right"
+interval = 2000
+interface = "auto"
+
+[[widgets]]
+type = "battery"
+position = "right"
+interval = 10000
+"#;
+
+// ── CLI subcommand helpers ────────────────────────────────────────────────────
+
+/// Write the starter config to the XDG config path.
+///
+/// Writes [`STARTER_CONFIG`] to `~/.config/frames/config.toml` (or the path
+/// in `FRAMES_CONFIG`). Returns an error if the file already exists to prevent
+/// accidental overwrite. Creates parent directories if absent.
+///
+/// # Errors
+///
+/// Returns an error if the file already exists, if the directory cannot be
+/// created, or if the write fails.
+fn init_config() -> anyhow::Result<()> {
+    let target = std::env::var("FRAMES_CONFIG").map_or_else(
+        |_| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| "/root".to_string());
+            std::path::PathBuf::from(home)
+                .join(".config")
+                .join("frames")
+                .join("config.toml")
+        },
+        std::path::PathBuf::from,
+    );
+
+    if target.exists() {
+        anyhow::bail!(
+            "config already exists at {}; refusing to overwrite.\n\
+             Delete or rename the file first if you want a fresh starter config.",
+            target.display()
+        );
+    }
+
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("could not create config directory {}", parent.display()))?;
+    }
+
+    std::fs::write(&target, STARTER_CONFIG)
+        .with_context(|| format!("could not write config to {}", target.display()))?;
+
+    println!("Wrote config to {}", target.display());
+    Ok(())
+}
+
+/// Print the JSON Schema for [`FramesConfig`] to stdout.
+///
+/// Calls [`frames_core::config_schema_json`] and prints the result. No GTK
+/// initialisation is required. Intended for use with editor tooling (VS Code +
+/// taplo / Even Better TOML extension).
+fn dump_schema() {
+    println!("{}", frames_core::config_schema_json());
 }

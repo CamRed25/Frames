@@ -8,7 +8,7 @@
 use gtk::prelude::*;
 
 use frames_core::widget::PlaybackStatus;
-use frames_core::{WidgetConfig, WidgetData};
+use frames_core::{MediaConfig, WidgetData};
 
 /// Maximum display length (in Unicode scalar values) for the track title and
 /// artist fields. Strings longer than this threshold are truncated with `…`.
@@ -31,7 +31,7 @@ impl MediaWidget {
     /// contract with constructors that can fail.
     // clippy::unnecessary_wraps: consistent renderer contract — other constructors are fallible
     #[allow(clippy::unnecessary_wraps)]
-    pub fn new(_config: &WidgetConfig) -> anyhow::Result<Self> {
+    pub fn new(_config: &MediaConfig) -> anyhow::Result<Self> {
         let label = gtk::Label::new(None);
         label.set_widget_name("media");
         label.style_context().add_class("widget");

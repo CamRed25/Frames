@@ -118,17 +118,20 @@ mod tests {
     fn disk_update_returns_disk_variant() {
         let mut w = DiskWidget::new("disk", "/").expect("DiskWidget::new");
         let data = w.update().expect("update");
-        assert!(
-            matches!(data, WidgetData::Disk { .. }),
-            "expected WidgetData::Disk"
-        );
+        assert!(matches!(data, WidgetData::Disk { .. }), "expected WidgetData::Disk");
     }
 
     #[test]
     fn disk_root_has_nonzero_total() {
         let mut w = DiskWidget::new("disk", "/").expect("DiskWidget::new");
         let data = w.update().expect("update");
-        if let WidgetData::Disk { total_bytes, used_bytes, mount, .. } = data {
+        if let WidgetData::Disk {
+            total_bytes,
+            used_bytes,
+            mount,
+            ..
+        } = data
+        {
             assert_eq!(mount, "/");
             assert!(total_bytes > 0, "root filesystem total must be > 0");
             assert!(used_bytes <= total_bytes, "used cannot exceed total");
@@ -154,10 +157,15 @@ mod tests {
 
     #[test]
     fn disk_missing_mount_returns_zeros() {
-        let mut w = DiskWidget::new("disk", "/nonexistent-mount-point-xyz")
-            .expect("DiskWidget::new");
+        let mut w =
+            DiskWidget::new("disk", "/nonexistent-mount-point-xyz").expect("DiskWidget::new");
         let data = w.update().expect("update should not error for missing mount");
-        if let WidgetData::Disk { used_bytes, total_bytes, .. } = data {
+        if let WidgetData::Disk {
+            used_bytes,
+            total_bytes,
+            ..
+        } = data
+        {
             assert_eq!(used_bytes, 0);
             assert_eq!(total_bytes, 0);
         } else {

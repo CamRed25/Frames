@@ -5,7 +5,7 @@
 
 use gtk::prelude::*;
 
-use frames_core::{WidgetConfig, WidgetData};
+use frames_core::{VolumeConfig, WidgetData};
 
 /// GTK3 renderer for the volume widget.
 pub struct VolumeWidget {
@@ -14,7 +14,7 @@ pub struct VolumeWidget {
 }
 
 impl VolumeWidget {
-    /// Create a new volume renderer from the given widget config.
+    /// Create a new volume renderer from the given volume config.
     ///
     /// # Errors
     ///
@@ -22,14 +22,14 @@ impl VolumeWidget {
     /// consistency.
     // clippy::unnecessary_wraps: consistent renderer contract
     #[allow(clippy::unnecessary_wraps)]
-    pub fn new(config: &WidgetConfig) -> anyhow::Result<Self> {
+    pub fn new(config: &VolumeConfig) -> anyhow::Result<Self> {
         let label = gtk::Label::new(Some("VOL --"));
         label.set_widget_name("volume");
         label.style_context().add_class("widget");
         label.style_context().add_class("widget-volume");
         Ok(Self {
             label,
-            show_icon: config.show_icon.unwrap_or(false),
+            show_icon: config.show_icon.unwrap_or(true),
         })
     }
 

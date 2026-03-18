@@ -5,7 +5,7 @@
 
 use gtk::prelude::*;
 
-use frames_core::{BatteryStatus, WidgetConfig, WidgetData};
+use frames_core::{BatteryConfig, BatteryStatus, WidgetData};
 
 /// GTK3 renderer for the battery widget.
 pub struct BatteryWidget {
@@ -16,7 +16,7 @@ pub struct BatteryWidget {
 }
 
 impl BatteryWidget {
-    /// Create a new battery renderer from the given widget config.
+    /// Create a new battery renderer from the given battery config.
     ///
     /// # Errors
     ///
@@ -24,7 +24,7 @@ impl BatteryWidget {
     /// consistency.
     // clippy::unnecessary_wraps: consistent renderer contract — other constructors are fallible
     #[allow(clippy::unnecessary_wraps)]
-    pub fn new(config: &WidgetConfig) -> anyhow::Result<Self> {
+    pub fn new(config: &BatteryConfig) -> anyhow::Result<Self> {
         let label = gtk::Label::new(Some("BAT"));
         label.set_widget_name("battery");
         label.style_context().add_class("widget");

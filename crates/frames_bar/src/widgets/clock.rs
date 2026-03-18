@@ -6,7 +6,7 @@
 
 use gtk::prelude::*;
 
-use frames_core::{WidgetConfig, WidgetData};
+use frames_core::{ClockConfig, WidgetData};
 
 /// GTK3 renderer for the clock widget.
 pub struct ClockWidget {
@@ -14,7 +14,7 @@ pub struct ClockWidget {
 }
 
 impl ClockWidget {
-    /// Create a new clock renderer from the given widget config.
+    /// Create a new clock renderer from the given clock config.
     ///
     /// Creates a `GtkLabel`, names it `"clock"`, and adds the standard CSS
     /// classes `.widget` and `.widget-clock` for theming.
@@ -26,7 +26,7 @@ impl ClockWidget {
     /// that may fail (e.g. when acquiring X11 handles).
     // clippy::unnecessary_wraps: consistent renderer contract — other constructors are fallible
     #[allow(clippy::unnecessary_wraps)]
-    pub fn new(_config: &WidgetConfig) -> anyhow::Result<Self> {
+    pub fn new(_config: &ClockConfig) -> anyhow::Result<Self> {
         let label = gtk::Label::new(None);
         label.set_widget_name("clock");
         label.style_context().add_class("widget");

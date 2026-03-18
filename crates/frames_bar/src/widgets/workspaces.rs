@@ -12,6 +12,8 @@
 //! workspace changes are low-frequency EWMH events that do not benefit from
 //! the generic polling abstraction.
 
+use std::process::Command;
+
 use gdk::prelude::*;
 use gtk::prelude::*;
 
@@ -123,21 +125,16 @@ fn get_utf8_list(win: &gdk::Window, atom_name: &str) -> Vec<String> {
         .collect()
 }
 
-/// Send a `_NET_CURRENT_DESKTOP` property update to switch to workspace `idx`.
+/// Send a `_NET_CURRENT_DESKTOP` client message to switch to workspace `idx`.
+///
+/// Uses `wmctrl -s <idx>` which sends the correct EWMH `_NET_CURRENT_DESKTOP`
+/// `ClientMessage` event. Setting the property directly via `XChangeProperty` is
+/// ignored by Cinnamon — only the `ClientMessage` path triggers a workspace switch.
 fn send_desktop_change(_win: &gdk::Window, idx: usize) {
-    let root = gdk::Window::default_root_window();
-    let net_current_desktop = gdk::Atom::intern("_NET_CURRENT_DESKTOP");
-    let cardinal_type = gdk::Atom::intern("CARDINAL");
-
-    #[allow(clippy::cast_possible_truncation)] // idx is bounded by desktop count (≤ 256)
-    let desk_idx = idx as u32;
-    let val: [libc::c_ulong; 1] = [libc::c_ulong::from(desk_idx)];
-    gdk::property_change(
-        &root,
-        &net_current_desktop,
-        &cardinal_type,
-        32,
-        gdk::PropMode::Replace,
-        gdk::ChangeData::ULongs(&val),
-    );
+    if let Err(e) = Command::new("wmctrl")
+        .args(["-s", &idx.to_string()])
+        .spawn()
+    {
+        tracing::warn!(error = %e, desktop = idx, "wmctrl failed to send desktop change");
+    }
 }

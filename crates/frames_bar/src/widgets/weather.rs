@@ -4,7 +4,7 @@
 use gtk::prelude::*;
 
 use frames_core::widget::TempUnit;
-use frames_core::{WidgetConfig, WidgetData};
+use frames_core::{WeatherConfig, WidgetData};
 
 /// GTK3 renderer for the weather widget.
 pub struct WeatherWidget {
@@ -12,7 +12,7 @@ pub struct WeatherWidget {
 }
 
 impl WeatherWidget {
-    /// Create a new weather renderer from the given widget config.
+    /// Create a new weather renderer from the given weather config.
     ///
     /// CSS classes `.widget` and `.widget-weather` are applied to the label.
     ///
@@ -22,7 +22,7 @@ impl WeatherWidget {
     /// contract with constructors that can fail.
     // clippy::unnecessary_wraps: consistent renderer contract — other constructors are fallible
     #[allow(clippy::unnecessary_wraps)]
-    pub fn new(_config: &WidgetConfig) -> anyhow::Result<Self> {
+    pub fn new(_config: &WeatherConfig) -> anyhow::Result<Self> {
         let label = gtk::Label::new(None);
         label.set_widget_name("weather");
         label.style_context().add_class("widget");

@@ -1,7 +1,7 @@
 # Frames — Config Model
 
 > **Scope:** TOML configuration file structure, field definitions, defaults, validation rules, and config file location.
-> **Last Updated:** Mar 17, 2026
+> **Last Updated:** Jan 11, 2025
 
 ---
 
@@ -108,19 +108,23 @@ All widget entries share these fields:
 
 ### 4.2 Widget Types
 
-| `type` value | Description | Default interval |
-|-------------|-------------|-----------------|
-| `"clock"` | Date and time display | 1000 ms |
-| `"cpu"` | CPU usage percentage | 2000 ms |
-| `"memory"` | RAM and swap usage | 3000 ms |
-| `"network"` | Network rx/tx speed | 2000 ms |
-| `"battery"` | Battery charge and status | 5000 ms |
-| `"workspaces"` | Clickable workspace switcher | Event-driven (no poll) |
-| `"launcher"` | Windows-style app launcher popup | Event-driven (no poll) |
-| `"volume"` | PulseAudio/PipeWire output volume and mute state | 2000 ms |
-| `"brightness"` | Screen backlight brightness | 5000 ms |
-| `"weather"` | Current weather conditions from Open-Meteo API | 1 800 000 ms (30 min) |
-| `"media"` | Currently playing track via MPRIS2 D-Bus | 2000 ms |
+Each `type` value maps to a variant of the `WidgetKind` enum in `frames_core`. The `type` key is an internal serde tag — each variant wraps a dedicated struct that holds **only** the fields valid for that widget. Fields from another widget type (e.g. `latitude` on a `clock` widget) are **rejected at parse time** by `#[serde(deny_unknown_fields)]` on each variant struct. This means config errors surface immediately with a clear TOML parse error rather than at runtime.
+
+| `type` value | Rust struct | Description | Default interval |
+|-------------|-------------|-------------|------------------|
+| `"clock"` | `ClockConfig` | Date and time display | 1000 ms |
+| `"cpu"` | `CpuConfig` | CPU usage percentage | 2000 ms |
+| `"memory"` | `MemoryConfig` | RAM and swap usage | 3000 ms |
+| `"network"` | `NetworkConfig` | Network rx/tx speed | 2000 ms |
+| `"battery"` | `BatteryConfig` | Battery charge and status | 5000 ms |
+| `"disk"` | `DiskConfig` | Filesystem usage for a mount point | 30 000 ms |
+| `"workspaces"` | `WorkspacesConfig` | Clickable workspace switcher | Event-driven (no poll) |
+| `"launcher"` | `LauncherConfig` | Application launcher popup | Event-driven (no poll) |
+| `"volume"` | `VolumeConfig` | PulseAudio/PipeWire output volume and mute state | 2000 ms |
+| `"brightness"` | `BrightnessConfig` | Screen backlight brightness | 5000 ms |
+| `"weather"` | `WeatherConfig` | Current weather conditions from Open-Meteo API | 1 800 000 ms (30 min) |
+| `"media"` | `MediaConfig` | Currently playing track via MPRIS2 D-Bus | 2000 ms |
+| `"separator"` | `SeparatorConfig` | Visual divider between widgets | — |
 
 ### 4.3 Clock Widget Fields
 
@@ -232,7 +236,7 @@ on_scroll_down = "pactl set-sink-volume @DEFAULT_SINK@ -5%"
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `show_icon` | bool | `true` | Show a Unicode speaker icon (🔊/🔇) |
+| `show_icon` | bool | `true` | Show a Unicode speaker icon (🔊/🔇). Set `false` to suppress the icon |
 | `on_click` | string | — | Shell command run on left-click (inherited from §4.1) |
 | `on_scroll_up` | string | — | Shell command run on scroll up (inherited from §4.1) |
 | `on_scroll_down` | string | — | Shell command run on scroll down (inherited from §4.1) |
@@ -253,7 +257,7 @@ on_scroll_down = "brightnessctl set 10%-"
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `show_icon` | bool | `true` | Show a Unicode sun icon (☀) |
+| `show_icon` | bool | `true` | Show a Unicode sun icon (☀). Set `false` to suppress the icon |
 | `on_scroll_up` | string | — | Shell command run on scroll up (inherited from §4.1) |
 | `on_scroll_down` | string | — | Shell command run on scroll down (inherited from §4.1) |
 
@@ -328,14 +332,22 @@ Display formats:
 
 ## 5. Config Validation Rules
 
-At startup, `FramesConfig::load()` validates:
+Config loading uses a two-stage gate:
 
-1. `bar.height` must be > 0 and < screen height
-2. `bar.position` must be `"top"` or `"bottom"`
-3. Every `[[widgets]]` entry must have `type` and `position`
-4. `type` must be one of the known widget types (see §4.2)
-5. `position` must be `"left"`, `"center"`, or `"right"`
-6. Threshold fields must be in range 0.0–100.0 with `warn < crit` for CPU, and `crit < warn` for battery
+**Stage 1 — Parse-time (serde):**
+- `type` must be one of the 13 known widget types (see §4.2 table). An unknown or missing `type` key causes an immediate `toml::de::Error`.
+- `position` must be `"left"`, `"center"`, or `"right"`. Serde rejects other values.
+- Widget-specific fields are validated structurally: each `WidgetKind` variant wraps a dedicated struct annotated with `#[serde(deny_unknown_fields)]`. A field that belongs to a different widget type (e.g. `latitude` on a `clock` widget) is **rejected immediately** with a clear parse error, before `validate()` ever runs.
+
+**Stage 2 — `FramesConfig::validate()` (semantic, called after parse):**
+
+1. `bar.height` must be > 0
+2. `interval`, when present, must be > 0 (a value of 0 causes a tight polling busy-loop)
+3. For `WidgetKind::Cpu` and `WidgetKind::Battery`: threshold fields must be in range 0.0–100.0; for CPU `warn < crit`; for battery `crit < warn`
+4. For `WidgetKind::Weather`, `latitude` (when present) must be in −90.0–+90.0; `longitude` (when present) must be in −180.0–+180.0
+5. For `WidgetKind::Disk`, `mount` (when present) must be an absolute path starting with `/` after `~` / `$HOME` expansion
+
+`validate()` also performs `~` / `$HOME` path expansion **in-place** on `bar.css`, `bar.theme`, and disk widget `mount` fields so downstream code always receives expanded absolute paths.
 
 Validation errors are reported via `ConfigError::Validation { field, reason }` and cause the bar to exit with a user-readable message.
 

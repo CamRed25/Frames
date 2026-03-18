@@ -6,8 +6,8 @@
 //! so GTK's tooltip machinery receives the mouse-enter events it needs.
 //!
 //! Bar label format is controlled by `config.format`:
-//! - `"used"` (default) — `"DISK 45.2/931.5 GiB"`
-//! - `"percent"` — `"DISK 5%"`
+//! - `"percent"` (default) — `"DISK 5%"`
+//! - `"used"` — `"DISK 45.2/931.5 GiB"`
 //! - `"free"` — `"DISK free 886.3 GiB"`
 //!
 //! Hover tooltip shows one line per filesystem:
@@ -18,7 +18,7 @@
 
 use gtk::prelude::*;
 
-use frames_core::{WidgetConfig, WidgetData};
+use frames_core::{DiskConfig, WidgetData};
 
 /// GTK3 renderer for the disk usage widget.
 pub struct DiskWidget {
@@ -28,7 +28,7 @@ pub struct DiskWidget {
 }
 
 impl DiskWidget {
-    /// Create a new disk renderer from the given widget config.
+    /// Create a new disk renderer from the given disk config.
     ///
     /// The label is wrapped in an `EventBox` so that hover-tooltip events are
     /// received. CSS classes `.widget` and `.widget-disk` are applied to the
@@ -40,7 +40,7 @@ impl DiskWidget {
     /// consistency.
     // clippy::unnecessary_wraps: consistent renderer contract — other constructors are fallible
     #[allow(clippy::unnecessary_wraps)]
-    pub fn new(config: &WidgetConfig) -> anyhow::Result<Self> {
+    pub fn new(config: &DiskConfig) -> anyhow::Result<Self> {
         let label = gtk::Label::new(Some("DISK"));
         label.set_widget_name("disk");
         label.style_context().add_class("widget");
@@ -52,7 +52,7 @@ impl DiskWidget {
         Ok(Self {
             event_box,
             label,
-            format: config.format.clone().unwrap_or_else(|| "used".to_string()),
+            format: config.format.clone().unwrap_or_else(|| "percent".to_string()),
         })
     }
 
@@ -101,7 +101,11 @@ impl DiskWidget {
                         // clippy::cast_precision_loss: byte counts vs f64 acceptable
                         // clippy::cast_possible_truncation: pct is always 0–100, fits in u8
                         // clippy::cast_sign_loss: ratio * 100 is always non-negative
-                        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                        #[allow(
+                            clippy::cast_precision_loss,
+                            clippy::cast_possible_truncation,
+                            clippy::cast_sign_loss
+                        )]
                         let pct = if e.total_bytes > 0 {
                             (e.used_bytes as f64 / e.total_bytes as f64 * 100.0) as u8
                         } else {
